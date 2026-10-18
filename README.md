@@ -136,7 +136,8 @@ second story ready to run.
 1. **unit**: offline tests of the evaluator and traceability (seconds).
 2. **e2e**: starts Gitea + Postgres in the runner, runs smoke tests first, then the full UI/API/DB suite.
    Any unexpected failure, or a known bug that starts passing, fails the build. Builds the Allure report
-   (artifact; also published to GitHub Pages on `main` once Pages is set to "GitHub Actions").
+   (artifact on every run; also published to GitHub Pages on `main` when Pages is set to "GitHub Actions"
+   and the repository variable `PUBLISH_PAGES` is `true`).
 3. **load**: 60 s Locust run; fails on more than 1 % errors or p95 above 800 ms.
 4. **ai-eval**: regenerates cases if an `ANTHROPIC_API_KEY` secret exists, then evaluates them.
 

@@ -17,8 +17,8 @@ jobs:
     name: Unit tests (offline)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - run: pytest tests/unit -m unit
@@ -28,8 +28,8 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
@@ -55,13 +55,13 @@ jobs:
           PROPS
           npx --yes allure-commandline@2.30.0 generate allure-results -o allure-report --clean
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: allure-report
           path: allure-report
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: playwright-failures
@@ -72,14 +72,15 @@ jobs:
         run: docker compose logs --tail=200 gitea
 
       - uses: actions/upload-pages-artifact@v3
-        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: always() && vars.PUBLISH_PAGES == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: allure-report
 
   publish-report:
     name: Publish Allure report to GitHub Pages
     needs: e2e
-    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.e2e.result != 'skipped'
+    # Opt-in: set the repository variable PUBLISH_PAGES=true once Pages is enabled (Settings > Pages > GitHub Actions).
+    if: always() && vars.PUBLISH_PAGES == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.e2e.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -96,8 +97,8 @@ jobs:
     needs: e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - run: bash scripts/bootstrap.sh
@@ -106,7 +107,7 @@ jobs:
           mkdir -p load/results
           locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
                  --csv load/results/run --html load/results/report.html --only-summary
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: load-report
@@ -119,8 +120,8 @@ jobs:
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - name: Generate fresh cases (only when an API key secret is configured)
@@ -128,7 +129,7 @@ jobs:
         run: python -m ai.generate ai/stories/create_issue.md
       - name: Compare with the manual suite
         run: python -m ai.evaluate ai/output/create_issue.ai.json --feature Issues
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ai-evaluation
           path: ai/output
