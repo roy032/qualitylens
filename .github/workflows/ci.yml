@@ -1,0 +1,134 @@
+name: QualityLens CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  unit:
+    name: Unit tests (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: pytest tests/unit -m unit
+
+  e2e:
+    name: UI + API + DB tests
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+
+      - name: Start Gitea + PostgreSQL
+        run: bash scripts/bootstrap.sh
+
+      - name: Smoke tests (stop early if the basics are broken)
+        run: pytest -m smoke --alluredir=allure-results
+
+      - name: Full regression suite
+        run: pytest -m "(ui or api or db) and not smoke" --alluredir=allure-results --screenshot=only-on-failure --output=test-results
+
+      - name: Build Allure report
+        if: always()
+        run: |
+          mkdir -p allure-results
+          cat > allure-results/environment.properties <<PROPS
+          Gitea=1.22.6
+          Database=PostgreSQL 16
+          Browser=Chromium (Playwright)
+          Commit=${{ github.sha }}
+          PROPS
+          npx --yes allure-commandline@2.30.0 generate allure-results -o allure-report --clean
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report
+          path: allure-report
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failures
+          path: test-results
+
+      - name: App logs on failure
+        if: failure()
+        run: docker compose logs --tail=200 gitea
+
+      - uses: actions/upload-pages-artifact@v3
+        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          path: allure-report
+
+  publish-report:
+    name: Publish Allure report to GitHub Pages
+    needs: e2e
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.e2e.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  load:
+    name: Load test (Locust)
+    needs: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: bash scripts/bootstrap.sh
+      - name: 60 s at 20 users; fails if error rate > 1% or p95 > 800 ms
+        run: |
+          mkdir -p load/results
+          locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
+                 --csv load/results/run --html load/results/report.html --only-summary
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-report
+          path: load/results
+
+  ai-eval:
+    name: AI test-case generation + evaluation
+    needs: unit
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt
+      - name: Generate fresh cases (only when an API key secret is configured)
+        if: env.ANTHROPIC_API_KEY != ''
+        run: python -m ai.generate ai/stories/create_issue.md
+      - name: Compare with the manual suite
+        run: python -m ai.evaluate ai/output/create_issue.ai.json --feature Issues
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-evaluation
+          path: ai/output

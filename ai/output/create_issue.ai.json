@@ -1,0 +1,389 @@
+{
+  "source": "ai/stories/create_issue.md",
+  "model": "claude (sample run, see note)",
+  "generated_at": "2026-10-13T00:00:00+00:00",
+  "note": "Sample produced by Claude from SYSTEM_PROMPT and this story while building the repo. Regenerate with: python -m ai.generate ai/stories/create_issue.md",
+  "test_cases": [
+    {
+      "id": "AI-1",
+      "title": "Create issue with valid title and description",
+      "type": "Positive",
+      "priority": "P1",
+      "preconditions": "Signed in with write access; repository exists",
+      "steps": [
+        "Open New Issue",
+        "Enter a title and a description",
+        "Click Create Issue"
+      ],
+      "test_data": "Title 'Login fails on Safari', body 'Steps to reproduce...'",
+      "expected_result": "Issue is created as #1, state Open, title and description shown",
+      "acceptance_criterion": 1
+    },
+    {
+      "id": "AI-2",
+      "title": "Create issue with title only",
+      "type": "Positive",
+      "priority": "P2",
+      "preconditions": "Signed in with write access",
+      "steps": [
+        "Open New Issue",
+        "Enter a title, leave description empty",
+        "Click Create Issue"
+      ],
+      "test_data": "Title 'Typo on homepage'",
+      "expected_result": "Issue created with empty description",
+      "acceptance_criterion": 1
+    },
+    {
+      "id": "AI-3",
+      "title": "Reject empty title",
+      "type": "Negative",
+      "priority": "P1",
+      "preconditions": "Signed in",
+      "steps": [
+        "Open New Issue",
+        "Leave title empty",
+        "Click Create Issue"
+      ],
+      "test_data": "Title ''",
+      "expected_result": "Issue not created; validation error for required title (API 422)",
+      "acceptance_criterion": 2
+    },
+    {
+      "id": "AI-4",
+      "title": "Reject whitespace-only title",
+      "type": "Negative",
+      "priority": "P1",
+      "preconditions": "Signed in",
+      "steps": [
+        "Open New Issue",
+        "Enter only spaces or a tab as title",
+        "Submit via UI and via POST /issues"
+      ],
+      "test_data": "'   ', '\\t'",
+      "expected_result": "Rejected in UI and API (422); no issue with blank title is stored",
+      "acceptance_criterion": 2
+    },
+    {
+      "id": "AI-5",
+      "title": "Title at maximum length 255",
+      "type": "Boundary",
+      "priority": "P2",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create an issue with a 255-character title"
+      ],
+      "test_data": "255 characters",
+      "expected_result": "Issue created; stored title equals input exactly",
+      "acceptance_criterion": 2
+    },
+    {
+      "id": "AI-6",
+      "title": "Title one over maximum (256)",
+      "type": "Boundary",
+      "priority": "P2",
+      "preconditions": "Signed in",
+      "steps": [
+        "POST an issue with a 256-character title"
+      ],
+      "test_data": "256 characters",
+      "expected_result": "Request rejected with 422; title not truncated silently",
+      "acceptance_criterion": 2
+    },
+    {
+      "id": "AI-7",
+      "title": "Title of one character",
+      "type": "Boundary",
+      "priority": "P3",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create an issue with title 'x'"
+      ],
+      "test_data": "'x'",
+      "expected_result": "Issue created",
+      "acceptance_criterion": 2
+    },
+    {
+      "id": "AI-8",
+      "title": "Issue numbers are sequential per repository",
+      "type": "Positive",
+      "priority": "P2",
+      "preconditions": "Empty repository",
+      "steps": [
+        "Create three issues"
+      ],
+      "test_data": "-",
+      "expected_result": "Issues numbered 1, 2, 3",
+      "acceptance_criterion": 3
+    },
+    {
+      "id": "AI-9",
+      "title": "Numbering is independent between repositories",
+      "type": "Positive",
+      "priority": "P3",
+      "preconditions": "Two repositories",
+      "steps": [
+        "Create an issue in repo A",
+        "Create an issue in repo B"
+      ],
+      "test_data": "-",
+      "expected_result": "Both issues are #1 in their own repository",
+      "acceptance_criterion": 3
+    },
+    {
+      "id": "AI-10",
+      "title": "Anonymous user cannot create issue",
+      "type": "Security",
+      "priority": "P1",
+      "preconditions": "Not signed in",
+      "steps": [
+        "POST /issues without credentials"
+      ],
+      "test_data": "-",
+      "expected_result": "401 Unauthorized; no issue created",
+      "acceptance_criterion": 4
+    },
+    {
+      "id": "AI-11",
+      "title": "User without write access cannot create issue in private repo",
+      "type": "Security",
+      "priority": "P1",
+      "preconditions": "Signed in as user with no access to a private repo",
+      "steps": [
+        "POST /issues to the private repo"
+      ],
+      "test_data": "-",
+      "expected_result": "404 or 403; no issue created",
+      "acceptance_criterion": 4
+    },
+    {
+      "id": "AI-12",
+      "title": "Create issue in non-existent repository",
+      "type": "Negative",
+      "priority": "P2",
+      "preconditions": "Signed in",
+      "steps": [
+        "POST /issues to /repos/{owner}/does-not-exist"
+      ],
+      "test_data": "-",
+      "expected_result": "404 Not Found",
+      "acceptance_criterion": 4
+    },
+    {
+      "id": "AI-13",
+      "title": "Unicode and emoji title stored exactly",
+      "type": "Positive",
+      "priority": "P3",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create issue with Unicode title",
+        "Reload the issue"
+      ],
+      "test_data": "'ünïcödé 测试 🐞'",
+      "expected_result": "Title displayed and returned by API exactly as entered",
+      "acceptance_criterion": 5
+    },
+    {
+      "id": "AI-14",
+      "title": "HTML in title is rendered as text",
+      "type": "Security",
+      "priority": "P1",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create issue titled <script>alert(1)</script>",
+        "Open the issue page"
+      ],
+      "test_data": "<script>alert(1)</script>",
+      "expected_result": "Title shown literally; no script executes",
+      "acceptance_criterion": 5
+    },
+    {
+      "id": "AI-15",
+      "title": "SQL metacharacters in title",
+      "type": "Security",
+      "priority": "P2",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create issue with SQL injection string as title"
+      ],
+      "test_data": "'; DROP TABLE issue; --",
+      "expected_result": "Issue stored literally; database unaffected",
+      "acceptance_criterion": 5
+    },
+    {
+      "id": "AI-16",
+      "title": "Markdown in description renders safely",
+      "type": "Positive",
+      "priority": "P3",
+      "preconditions": "Signed in",
+      "steps": [
+        "Create issue with Markdown and an HTML img onerror in body"
+      ],
+      "test_data": "**bold**, <img src=x onerror=alert(1)>",
+      "expected_result": "Markdown rendered; onerror handler stripped",
+      "acceptance_criterion": 5
+    },
+    {
+      "id": "AI-17",
+      "title": "Add a comment to an issue",
+      "type": "Positive",
+      "priority": "P1",
+      "preconditions": "Open issue exists",
+      "steps": [
+        "Open the issue",
+        "Type a comment",
+        "Click Comment"
+      ],
+      "test_data": "'Reproduced on Chrome'",
+      "expected_result": "Comment appears in timeline; comment count increases",
+      "acceptance_criterion": 6
+    },
+    {
+      "id": "AI-18",
+      "title": "Reject empty comment",
+      "type": "Negative",
+      "priority": "P2",
+      "preconditions": "Open issue exists",
+      "steps": [
+        "Submit a comment with empty body"
+      ],
+      "test_data": "''",
+      "expected_result": "Comment rejected (422); timeline unchanged",
+      "acceptance_criterion": 6
+    },
+    {
+      "id": "AI-19",
+      "title": "Reject whitespace-only comment",
+      "type": "Negative",
+      "priority": "P3",
+      "preconditions": "Open issue exists",
+      "steps": [
+        "Submit a comment containing only spaces"
+      ],
+      "test_data": "'   '",
+      "expected_result": "Comment rejected",
+      "acceptance_criterion": 6
+    },
+    {
+      "id": "AI-20",
+      "title": "Close an open issue",
+      "type": "Positive",
+      "priority": "P1",
+      "preconditions": "Open issue exists",
+      "steps": [
+        "Open the issue",
+        "Click Close Issue"
+      ],
+      "test_data": "-",
+      "expected_result": "State Closed; closed timestamp set; repository open-issue count decreases by 1",
+      "acceptance_criterion": 7
+    },
+    {
+      "id": "AI-21",
+      "title": "Reopen a closed issue",
+      "type": "Positive",
+      "priority": "P2",
+      "preconditions": "Closed issue exists",
+      "steps": [
+        "Reopen the issue"
+      ],
+      "test_data": "-",
+      "expected_result": "State Open; closed timestamp cleared; open count increases by 1",
+      "acceptance_criterion": 7
+    },
+    {
+      "id": "AI-22",
+      "title": "Closing an already closed issue",
+      "type": "Negative",
+      "priority": "P3",
+      "preconditions": "Closed issue exists",
+      "steps": [
+        "PATCH state=closed again"
+      ],
+      "test_data": "-",
+      "expected_result": "No error; counters do not change twice",
+      "acceptance_criterion": 7
+    },
+    {
+      "id": "AI-23",
+      "title": "Invalid state value on update",
+      "type": "Negative",
+      "priority": "P3",
+      "preconditions": "Issue exists",
+      "steps": [
+        "PATCH state='bogus'"
+      ],
+      "test_data": "bogus",
+      "expected_result": "Request rejected with validation error",
+      "acceptance_criterion": 7
+    },
+    {
+      "id": "AI-24",
+      "title": "Filter issue list by state",
+      "type": "Positive",
+      "priority": "P2",
+      "preconditions": "Open and closed issues exist",
+      "steps": [
+        "GET ?state=open",
+        "GET ?state=closed",
+        "GET ?state=all"
+      ],
+      "test_data": "open, closed, all",
+      "expected_result": "Each request returns only the matching issues",
+      "acceptance_criterion": 8
+    },
+    {
+      "id": "AI-25",
+      "title": "Filter by open state returns only open issues",
+      "type": "Positive",
+      "priority": "P3",
+      "preconditions": "Open and closed issues exist",
+      "steps": [
+        "GET issues with state=open"
+      ],
+      "test_data": "state=open",
+      "expected_result": "Only open issues returned",
+      "acceptance_criterion": 8
+    },
+    {
+      "id": "AI-26",
+      "title": "Pagination with limit and page",
+      "type": "Boundary",
+      "priority": "P2",
+      "preconditions": "5 issues exist",
+      "steps": [
+        "GET ?limit=2&page=1",
+        "GET ?limit=2&page=3"
+      ],
+      "test_data": "limit=2",
+      "expected_result": "2 items, then 1 item; X-Total-Count header is 5",
+      "acceptance_criterion": 8
+    },
+    {
+      "id": "AI-27",
+      "title": "Page beyond last page",
+      "type": "Boundary",
+      "priority": "P3",
+      "preconditions": "5 issues exist",
+      "steps": [
+        "GET ?limit=2&page=10"
+      ],
+      "test_data": "page=10",
+      "expected_result": "200 with empty list",
+      "acceptance_criterion": 8
+    },
+    {
+      "id": "AI-28",
+      "title": "Invalid state filter value",
+      "type": "Negative",
+      "priority": "P3",
+      "preconditions": "Issues exist",
+      "steps": [
+        "GET ?state=bogus"
+      ],
+      "test_data": "bogus",
+      "expected_result": "400/422 validation error",
+      "acceptance_criterion": 8
+    }
+  ]
+}

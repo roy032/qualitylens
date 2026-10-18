@@ -1,0 +1,19 @@
+BUG-003 evidence. Gitea 1.22.6, http://localhost:3000
+
+# Create label 'bug'
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-dc3236cc/labels
+> {"name": "bug", "color": "#ff0000"}
+< 201
+< {"id": 5, "name": "bug", "color": "ff0000"}
+
+# Create label 'bug' again
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-dc3236cc/labels
+> {"name": "bug", "color": "#00ff00"}
+< 201
+< {"id": 6, "name": "bug", "color": "00ff00"}
+
+# List labels: two labels named 'bug'
+> GET http://localhost:3000/api/v1/repos/qa_admin/evidence-dc3236cc/labels
+
+< 200
+< [{"id": 5, "name": "bug"}, {"id": 6, "name": "bug"}]

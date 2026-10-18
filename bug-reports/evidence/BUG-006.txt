@@ -1,0 +1,7 @@
+BUG-006 evidence. Gitea 1.22.6, http://localhost:3000
+
+# POST a truncated JSON body
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-dc3236cc/issues
+> {"title":
+< 422
+< {"message": "[]: invalid character '\u0000' looking for beginning of value", "url": "http://localhost:3000/api/swagger"}
