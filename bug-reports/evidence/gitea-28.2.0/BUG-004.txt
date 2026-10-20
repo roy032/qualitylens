@@ -1,0 +1,13 @@
+BUG-004 evidence. Gitea 28.2.0, http://localhost:3000
+
+# Create user with a 4-character password
+> POST http://localhost:3000/api/v1/admin/users
+> {"username": "user_6dfb9e85", "email": "user_6dfb9e85@example.com", "password": "Ab1!", "must_change_password": false}
+< 400
+< {"message": "PasswordIsRequired", "url": "http://localhost:3000/api/swagger"}
+
+# For comparison: no password at all
+> POST http://localhost:3000/api/v1/admin/users
+> {"username": "user_001e2e10", "email": "user_001e2e10@example.com", "password": "", "must_change_password": false}
+< 400
+< {"message": "PasswordIsRequired", "url": "http://localhost:3000/api/swagger"}

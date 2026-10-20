@@ -1,0 +1,19 @@
+BUG-001 evidence. Gitea 28.2.0, http://localhost:3000
+
+# Create issue with title of three spaces
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues
+> {"title": "   "}
+< 201
+< {"number": 1, "title": "", "state": "open"}
+
+# Read it back: title is now an empty string
+> GET http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues/1
+
+< 200
+< {"number": 1, "title": "", "state": "open"}
+
+# For comparison: an empty title is rejected
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues
+> {"title": ""}
+< 422
+< {"message": "[Title]: Required", "url": "http://localhost:3000/api/swagger"}

@@ -1,0 +1,7 @@
+BUG-006 evidence. Gitea 28.2.0, http://localhost:3000
+
+# POST a truncated JSON body
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues
+> {"title":
+< 422
+< {"message": "[]: jsontext: unexpected EOF within \"/title\" after offset 9", "url": "http://localhost:3000/api/swagger"}

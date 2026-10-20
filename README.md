@@ -61,6 +61,46 @@ make report           # open the Allure report (needs Java)
 Other targets: `make smoke | ui | api | db | unit | load | evidence | ai-eval | down`.
 Gitea is then at http://localhost:3000 (user `qa_admin`, password `QaAdmin#2026`, local only).
 Settings can be overridden with environment variables, see [.env.example](.env.example).
+`GITEA_VERSION` picks another Gitea image (default `1.22.6`), see [retesting the bugs](bug-reports/README.md#triage-20-oct-2026).
+
+**Windows (PowerShell, Docker Desktop):** there is no `make`, so run the commands behind each target:
+
+```powershell
+python -m venv .venv; .venv\Scripts\Activate.ps1
+pip install -r requirements.txt; python -m playwright install chromium
+docker compose up -d --wait
+docker compose exec -T -u git gitea gitea admin user create --admin --username qa_admin `
+  --password "QaAdmin#2026" --email qa_admin@example.com --must-change-password=false
+pytest --alluredir=allure-results
+```
+
+## Demo in five minutes
+
+A walkthrough for showing the project to someone, after `make up`:
+
+1. **The app.** Open http://localhost:3000 and sign in as `qa_admin`. This is the system under test.
+2. **Manual design.** Open [test-cases/manual_test_cases.csv](test-cases/manual_test_cases.csv): 48 cases, each
+   naming the automated test that covers it. Run `pytest -m unit -q` to show the traceability check.
+3. **Smoke, then everything.** `pytest -m smoke -q` (seconds), then `make test`: about a minute,
+   155 passed and 7 xfailed. Add `--headed -m ui` to watch the browser tests drive Gitea.
+4. **A bug, live.** `pytest -m known_bug -rA` lists the seven pinned defects. Reproduce one by hand:
+
+   ```bash
+   curl -s -u 'qa_admin:QaAdmin#2026' -H 'Content-Type: application/json' \
+        -d '{"name":"demo"}' http://localhost:3000/api/v1/user/repos > /dev/null
+   curl -s -u 'qa_admin:QaAdmin#2026' -H 'Content-Type: application/json' \
+        -d '{"title":"   "}' http://localhost:3000/api/v1/repos/qa_admin/demo/issues
+   ```
+
+   Gitea answers `201` with `"title":""` (BUG-001); the issue list at
+   http://localhost:3000/qa_admin/demo/issues shows a blank row. Then open
+   [the bug report](bug-reports/BUG-001-whitespace-issue-title.md).
+5. **Report.** `make report` opens Allure: results by feature, with the seven known bugs shown as expected failures (xfail).
+6. **Load.** `make load`: 60 s, 20 users, prints `LOAD TEST PASSED` with the error rate and p95.
+7. **AI layer.** Show [the evaluation report](ai/output/create_issue.report.md) and
+   [the human review](ai/output/create_issue.review.md) that found BUG-007; `make ai-eval` re-runs it.
+
+`make down` removes everything afterwards.
 
 ## What is where
 
