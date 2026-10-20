@@ -19,6 +19,11 @@
 `422` with `[]: invalid character '\u0000' looking for beginning of value`. The body contains no NUL
 character, so the message points the developer at a problem that does not exist.
 
+## Retest on Gitea 28.2.0 (20 Oct 2026)
+Partly fixed: the message is now `[]: jsontext: unexpected EOF within "/title" after offset 9`, which is
+accurate. The status is still `422` instead of `400`, so the regression test still fails as expected.
+See [evidence/gitea-28.2.0/BUG-006.txt](evidence/gitea-28.2.0/BUG-006.txt).
+
 ## Evidence
 [evidence/BUG-006.txt](evidence/BUG-006.txt)
 

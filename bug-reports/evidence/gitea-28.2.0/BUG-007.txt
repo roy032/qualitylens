@@ -1,0 +1,13 @@
+BUG-007 evidence. Gitea 28.2.0, http://localhost:3000
+
+# Comment consisting of three spaces
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues/3/comments
+> {"body": "   "}
+< 201
+< {"id": 13, "body": "   "}
+
+# For comparison: an empty comment is rejected
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues/3/comments
+> {"body": ""}
+< 422
+< {"message": "[Body]: Required", "url": "http://localhost:3000/api/swagger"}

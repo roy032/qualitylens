@@ -19,5 +19,37 @@ promoted to a normal regression test.
 **Severity** is the impact on the user or data (Critical, Major, Minor, Trivial).
 **Priority** is how soon it should be fixed (P1 now ... P4 when convenient).
 
-Status of all seven: confirmed locally on 1.22.6. Before filing upstream, search the
-[Gitea issue tracker](https://github.com/go-gitea/gitea/issues) for duplicates and retest on the latest release.
+## Triage (20 Oct 2026)
+
+All seven are defects in Gitea's server, not in QualityLens: each test asserts the documented or reasonable
+behaviour and the server answers differently. Nothing in this repository can fix them, so they stay pinned as
+strict `xfail`. To see whether they are still open upstream, the suite and `capture_evidence.py` were re-run on
+a clean install of the latest Gitea release, **28.2.0**
+([evidence](evidence/gitea-28.2.0/)):
+
+| ID | 1.22.6 | 28.2.0 | Status |
+|---|---|---|---|
+| BUG-001 | reproduces | reproduces | Open upstream |
+| BUG-002 | reproduces | reproduces | Open upstream |
+| BUG-003 | reproduces | reproduces | Open upstream |
+| BUG-004 | reproduces | reproduces | Open upstream |
+| BUG-005 | reproduces | reproduces | Open upstream |
+| BUG-006 | reproduces | partly fixed | Message is now accurate (`unexpected EOF within "/title"`); status is still 422, not 400 |
+| BUG-007 | reproduces | reproduces | Open upstream |
+
+The suite stays pinned to 1.22.6. On 28.2.0, 14 other tests fail. Most are version drift to handle in a
+later upgrade: changed login and repository UI markup (10 UI tests) and changed status codes for duplicate
+users (409 instead of 422) and reserved usernames (400 instead of 422). One looks like a **new candidate bug**:
+`POST /api/v1/user/repos` with the name `..` returns `500 Internal Server Error` with a validation message,
+where 1.22.6 returned 422. It is not filed as BUG-008 yet because the suite does not target 28.x.
+Before filing anything upstream, search the [Gitea issue tracker](https://github.com/go-gitea/gitea/issues)
+for duplicates.
+
+Retest on any version:
+
+```bash
+make down
+GITEA_VERSION=28.2.0 make up
+pytest -m known_bug -rA                                        # XFAIL = still broken, XPASS = fixed
+python scripts/capture_evidence.py bug-reports/evidence/gitea-28.2.0
+```

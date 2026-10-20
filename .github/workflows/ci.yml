@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p allure-results
           cat > allure-results/environment.properties <<PROPS
-          Gitea=1.22.6
+          Gitea=${GITEA_VERSION:-1.22.6}
           Database=PostgreSQL 16
           Browser=Chromium (Playwright)
           Commit=${{ github.sha }}

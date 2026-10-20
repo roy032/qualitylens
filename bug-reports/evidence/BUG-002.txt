@@ -1,7 +1,7 @@
 BUG-002 evidence. Gitea 1.22.6, http://localhost:3000
 
 # Create issue with a 256-character title
-> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-dc3236cc/issues
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-32798180/issues
 > {"title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
 < 201
 < {"number": 2, "state": "open"}

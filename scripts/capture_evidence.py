@@ -1,10 +1,11 @@
 """Reproduce every confirmed bug from a clean state and save the evidence.
 
-    python scripts/capture_evidence.py
+    python scripts/capture_evidence.py [OUTPUT_DIR]
 
 For each bug this writes bug-reports/evidence/BUG-00N.txt (the exact HTTP requests
 and responses) and, where the bug is visible in the UI, BUG-00N.png. Re-run it
-against a newer Gitea version to check whether a bug has been fixed.
+against a newer Gitea version to check whether a bug has been fixed, passing an
+OUTPUT_DIR such as bug-reports/evidence/gitea-28.2.0 to keep the pinned evidence intact.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from qualitylens.api_client import GiteaApi  # noqa: E402
 from qualitylens.config import settings  # noqa: E402
 from qualitylens.data import new_user_payload, unique  # noqa: E402
 
-OUT = ROOT / "bug-reports" / "evidence"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "bug-reports" / "evidence"
 OWNER = settings.admin_user
 api = GiteaApi(auth=(settings.admin_user, settings.admin_password))
 

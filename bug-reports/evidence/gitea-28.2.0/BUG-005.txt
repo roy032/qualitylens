@@ -1,0 +1,13 @@
+BUG-005 evidence. Gitea 28.2.0, http://localhost:3000
+
+# List issues with state=bogus
+> GET http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues?state=bogus&limit=1
+
+< 200
+< [{"number": 2, "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…", "state": "open"}]
+
+# For comparison: the same value on edit is rejected
+> PATCH http://localhost:3000/api/v1/repos/qa_admin/evidence-ab418123/issues/1
+> {"state": "bogus"}
+< 412
+< {"message": "unknown state: bogus", "url": "http://localhost:3000/api/swagger"}
