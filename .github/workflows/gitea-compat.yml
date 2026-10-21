@@ -26,7 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         gitea: ${{ fromJSON(github.event.inputs.versions || '["1.22.6", "28.2.0"]') }}
-    continue-on-error: ${{ matrix.gitea != '1.22.6' }}
     env:
       GITEA_VERSION: ${{ matrix.gitea }}
     steps:
@@ -43,10 +42,14 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
       - run: python -m playwright install --with-deps chromium
       - run: bash scripts/bootstrap.sh
+      # Failures on a newer version are the point of the report, not a broken build: only the pinned
+      # version's failures fail the job (step-level, so the newer versions' checks stay green).
       - name: Suite (parallel)
+        continue-on-error: ${{ matrix.gitea != '1.22.6' }}
         run: pytest -m "not unit and not serial and not visual" -n auto --junitxml=results/regression.xml
       - name: Whole-database integrity rules
         if: success() || failure()
+        continue-on-error: ${{ matrix.gitea != '1.22.6' }}
         run: pytest -m serial --junitxml=results/integrity.xml
       - uses: actions/upload-artifact@v5
         if: always()
