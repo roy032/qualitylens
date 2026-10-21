@@ -1,0 +1,31 @@
+BUG-008 evidence. Gitea 1.22.6, http://localhost:3000
+
+# Create milestone with title ''
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-5741e199/milestones
+> {"title": ""}
+< 201
+< {"id": 1, "title": "", "state": "open"}
+
+# Create milestone with title '   '
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-5741e199/milestones
+> {"title": "   "}
+< 201
+< {"id": 2, "title": "", "state": "open"}
+
+# Create milestone without a title field
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-5741e199/milestones
+> {"description": "no title field at all"}
+< 201
+< {"id": 3, "title": "", "state": "open"}
+
+# List milestones: three with an empty title
+> GET http://localhost:3000/api/v1/repos/qa_admin/evidence-5741e199/milestones
+
+< 200
+< [{"id": 1, "title": ""}, {"id": 2, "title": ""}, {"id": 3, "title": ""}]
+
+# For comparison: issues reject an empty title
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-5741e199/issues
+> {"title": ""}
+< 422
+< {"message": "[Title]: Required", "url": "http://localhost:3000/api/swagger"}

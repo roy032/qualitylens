@@ -1,0 +1,38 @@
+name: Flake hunt
+
+# Runs the browser and API suites several times on one fresh app and reports every test whose
+# result changed between runs. Retries would hide flaky tests; this finds them so they get fixed.
+on:
+  schedule:
+    - cron: "0 3 * * 1"   # Mondays 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: How many times to run the suite
+        default: "3"
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: bash scripts/bootstrap.sh
+      - name: Repeat the suite
+        run: |
+          for i in $(seq 1 "${{ inputs.runs || 3 }}"); do
+            pytest -m "(ui or api or security or a11y) and not serial" -n auto -q \
+                   --junitxml="runs/run-$i.xml" || true
+          done
+      - name: Compare runs (fails when any test is flaky)
+        shell: bash  # adds pipefail, so the summary's exit code survives the pipe to tee
+        run: python scripts/ci_summary.py --runs runs/run-*.xml | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: flake-hunt-junit
+          path: runs

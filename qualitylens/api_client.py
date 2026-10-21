@@ -85,9 +85,30 @@ class GiteaApi:
     def add_comment(self, owner: str, repo: str, number: int, body: str):
         return self.post(f"/repos/{owner}/{repo}/issues/{number}/comments", json={"body": body})
 
+    def list_comments(self, owner: str, repo: str, number: int):
+        return self.get(f"/repos/{owner}/{repo}/issues/{number}/comments")
+
+    def edit_comment(self, owner: str, repo: str, comment_id: int, body: str):
+        return self.patch(f"/repos/{owner}/{repo}/issues/comments/{comment_id}", json={"body": body})
+
+    def delete_comment(self, owner: str, repo: str, comment_id: int):
+        return self.delete(f"/repos/{owner}/{repo}/issues/comments/{comment_id}")
+
+    # --- milestones --------------------------------------------------------
+    def create_milestone(self, owner: str, repo: str, title: str, **fields):
+        return self.post(f"/repos/{owner}/{repo}/milestones", json={"title": title, **fields})
+
+    def get_milestone(self, owner: str, repo: str, milestone_id: int):
+        return self.get(f"/repos/{owner}/{repo}/milestones/{milestone_id}")
+
     # --- labels ------------------------------------------------------------
     def create_label(self, owner: str, repo: str, name: str, color: str = "#ee0701", **fields):
         return self.post(f"/repos/{owner}/{repo}/labels", json={"name": name, "color": color, **fields})
 
     def list_labels(self, owner: str, repo: str):
         return self.get(f"/repos/{owner}/{repo}/labels")
+
+    # --- misc --------------------------------------------------------------
+    def render_markdown(self, text: str):
+        """Server-side Markdown rendering, the same sanitiser the web UI uses for issue and comment bodies."""
+        return self.post("/markdown", json={"text": text, "mode": "gfm"})

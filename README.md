@@ -1,7 +1,7 @@
 # QualityLens
 
-A complete QA process on one real application: manual test design, UI, API, database and load
-automation, CI with an Allure report, professional bug reports, and an AI test-case generator that is
+A complete QA process on one real application: manual test design, UI, API, database, security,
+accessibility and load automation, CI with an Allure report, professional bug reports, and an AI test-case generator that is
 measured against the hand-written suite.
 
 The system under test is **[Gitea](https://about.gitea.com) 1.22.6**, an open-source Git service, running
@@ -9,9 +9,12 @@ locally in Docker with PostgreSQL.
 
 | | |
 |---|---|
-| Manual test cases | 48, each traced to an automated test ([CSV](test-cases/manual_test_cases.csv)) |
-| Automated tests | 162: 29 UI, 63 API, 13 database, 57 offline unit/traceability |
-| Bugs found | 7 confirmed in Gitea 1.22.6, one of them found by the AI layer ([reports](bug-reports/README.md)) |
+| Manual test cases | 71, each traced to an automated test ([CSV](test-cases/manual_test_cases.csv)) |
+| Automated tests | 281: 29 UI, 88 API, 13 database, 43 security, 13 accessibility, 95 offline unit/traceability |
+| Bugs found | 10 confirmed in Gitea 1.22.6 (all still open in 28.2.0), one found by the AI layer ([reports](bug-reports/README.md)) |
+| Security | Access control between users, stored XSS, CSRF, cookies, clickjacking, SQL metacharacters, path traversal |
+| Accessibility | 9 screens scanned against WCAG 2.1 AA with axe-core, regressions fail the build ([audit](docs/accessibility.md)) |
+| CI | Parallel run (about 1 minute for the browser, API and DB suites), Allure trend history, per-layer run summary, weekly flake hunt |
 | Load test | 20 users, 0 % errors, p95 180 ms, with pass/fail thresholds ([baseline](load/README.md)) |
 | AI generator | 94 % of the manual "Issues" cases reproduced; found a case the manual suite missed ([review](ai/output/create_issue.review.md)) |
 
@@ -27,13 +30,17 @@ flowchart LR
 
     subgraph Suite["pytest"]
         UI["tests/ui<br/>Playwright + Page Objects"]
-        API["tests/api<br/>requests"]
+        API["tests/api<br/>requests + JSON Schema"]
+        SEC["tests/security<br/>access control, XSS, CSRF"]
+        A11Y["tests/a11y<br/>axe-core, WCAG 2.1 AA"]
         DB["tests/db<br/>SQL checks"]
         F["fixtures (conftest.py)<br/>create/clean data via API"]
     end
 
     UI -- browser --> G
     API -- HTTP --> G
+    SEC -- "HTTP + browser" --> G
+    A11Y -- browser --> G
     F -- HTTP --> G
     DB -- "SELECT only" --> P
     L["load/locustfile.py<br/>Locust"] -- HTTP --> G
@@ -58,7 +65,7 @@ make test             # everything, writes allure-results/
 make report           # open the Allure report (needs Java)
 ```
 
-Other targets: `make smoke | ui | api | db | unit | load | evidence | ai-eval | down`.
+Other targets: `make fast | smoke | ui | api | db | security | a11y | unit | load | flake-hunt | evidence | ai-eval | down`.
 Gitea is then at http://localhost:3000 (user `qa_admin`, password `QaAdmin#2026`, local only).
 Settings can be overridden with environment variables, see [.env.example](.env.example).
 `GITEA_VERSION` picks another Gitea image (default `1.22.6`), see [retesting the bugs](bug-reports/README.md#triage-20-oct-2026).
@@ -81,9 +88,9 @@ A walkthrough for showing the project to someone, after `make up`:
 1. **The app.** Open http://localhost:3000 and sign in as `qa_admin`. This is the system under test.
 2. **Manual design.** Open [test-cases/manual_test_cases.csv](test-cases/manual_test_cases.csv): 48 cases, each
    naming the automated test that covers it. Run `pytest -m unit -q` to show the traceability check.
-3. **Smoke, then everything.** `pytest -m smoke -q` (seconds), then `make test`: about a minute,
-   155 passed and 7 xfailed. Add `--headed -m ui` to watch the browser tests drive Gitea.
-4. **A bug, live.** `pytest -m known_bug -rA` lists the seven pinned defects. Reproduce one by hand:
+3. **Smoke, then everything.** `pytest -m smoke -q` (seconds), then `make fast`: about a minute on
+   every CPU core, 268 passed and 13 xfailed (`make test` runs the same suite on one core in about two). Add `--headed -m ui` to watch the browser tests drive Gitea.
+4. **A bug, live.** `pytest -m known_bug -rA` lists the ten pinned defects. Reproduce one by hand:
 
    ```bash
    curl -s -u 'qa_admin:QaAdmin#2026' -H 'Content-Type: application/json' \
@@ -95,9 +102,12 @@ A walkthrough for showing the project to someone, after `make up`:
    Gitea answers `201` with `"title":""` (BUG-001); the issue list at
    http://localhost:3000/qa_admin/demo/issues shows a blank row. Then open
    [the bug report](bug-reports/BUG-001-whitespace-issue-title.md).
-5. **Report.** `make report` opens Allure: results by feature, with the seven known bugs shown as expected failures (xfail).
-6. **Load.** `make load`: 60 s, 20 users, prints `LOAD TEST PASSED` with the error rate and p95.
-7. **AI layer.** Show [the evaluation report](ai/output/create_issue.report.md) and
+5. **Report.** `make report` opens Allure: results by feature, with the ten known bugs shown as expected failures (xfail).
+   In CI the report also has trend charts across runs, and each run's page shows a per-layer summary table.
+6. **Security and accessibility.** `make security` (access control between two users, XSS, CSRF, injection)
+   and `make a11y` (WCAG 2.1 AA scan of nine screens); the findings are in [docs/accessibility.md](docs/accessibility.md).
+7. **Load.** `make load`: 60 s, 20 users, prints `LOAD TEST PASSED` with the error rate and p95.
+8. **AI layer.** Show [the evaluation report](ai/output/create_issue.report.md) and
    [the human review](ai/output/create_issue.review.md) that found BUG-007; `make ai-eval` re-runs it.
 
 `make down` removes everything afterwards.
@@ -107,9 +117,12 @@ A walkthrough for showing the project to someone, after `make up`:
 ```
 docker-compose.yml        target app: Gitea + PostgreSQL, versions pinned
 scripts/bootstrap.sh      start the app and create the admin account (idempotent)
-qualitylens/              framework: config, API client, read-only DB helper, test data factory
+qualitylens/              framework: config, API client, read-only DB helper, test data factory,
+                          response schemas (schemas.py), axe-core wrapper (a11y.py)
 pages/                    Page Objects (login, register, dashboard, repo, issues)
-tests/ui|api|db|unit      automated tests, markers: smoke ui api db unit known_bug
+tests/ui|api|db|unit      automated tests, markers: smoke ui api db security a11y unit serial known_bug
+tests/security            access control between users, XSS, CSRF, cookies, injection, traversal
+tests/a11y                axe-core scans + baseline.json of known WCAG failures
 sql/integrity_checks.sql  data-integrity rules, also runnable by hand in psql
 load/                     Locust scenario with SLO thresholds, baseline results
 test-cases/               manual test cases (CSV, opens in Excel)
@@ -117,7 +130,10 @@ bug-reports/              7 bug reports + evidence/ (HTTP logs, screenshots)
 scripts/capture_evidence.py  reproduces every bug from scratch and refreshes evidence/
 ai/                       story -> test cases (generate.py), comparison (evaluate.py), sample output + review
 docs/test-plan.md         STLC test plan: scope, techniques, entry/exit criteria
+docs/accessibility.md     accessibility audit of Gitea 1.22.6
+scripts/ci_summary.py     JUnit XML -> Markdown run summary; --runs finds flaky tests
 .github/workflows/ci.yml  CI pipeline
+.github/workflows/flake-hunt.yml  weekly: run the suite 3 times, fail on any test whose result changed
 ```
 
 ## Coverage summary

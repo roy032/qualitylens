@@ -15,7 +15,8 @@ class NewRepoPage(BasePage):
         self.name.fill(name)
         if description:
             self.description.fill(description)
-        if private:
-            self.private.check()
+        # Always set the box explicitly: Gitea pre-ticks it when the user's last repository was private
+        # (repository.DEFAULT_PRIVATE = last), so relying on the default made tests order-dependent.
+        self.private.set_checked(private)
         self.submit.click()
         return self

@@ -72,3 +72,15 @@ def test_private_repo_hidden_from_anonymous(api, anon_api, cleanup):
     cleanup.append(name)
     api._ok(api.create_repo(name, private=True))
     assert anon_api.get_repo(OWNER, name).status_code == 404  # 404, not 403: don't confirm it exists
+
+
+@pytest.mark.known_bug
+@pytest.mark.xfail(strict=True, reason="BUG-010: search keywords are used as SQL LIKE patterns, so % and _ act as wildcards")
+@pytest.mark.parametrize("query", ["w_ld", "w%d"], ids=["underscore", "percent"])
+def test_search_treats_wildcards_literally(api, cleanup, query):
+    names = [unique("wild"), unique("wild")]
+    cleanup.extend(names)
+    for name in names:
+        api._ok(api.create_repo(name))
+    found = api.get("/repos/search", params={"q": query, "limit": 50}).json()["data"]
+    assert [r["name"] for r in found] == [], f"{query!r} should match only names containing it literally"

@@ -18,7 +18,7 @@ from qualitylens.db import Database
 
 def pytest_collection_modifyitems(session, config, items):
     """Fail fast with a clear message if the app is not running (skipped for offline unit tests)."""
-    if not any(item.get_closest_marker(m) for item in items for m in ("ui", "api", "db")):
+    if not any(item.get_closest_marker(m) for item in items for m in ("ui", "api", "db", "security", "a11y")):
         return
     try:
         requests.get(f"{settings.api_url}/version", timeout=5).raise_for_status()
