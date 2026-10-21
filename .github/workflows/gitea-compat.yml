@@ -1,0 +1,75 @@
+name: Gitea compatibility
+
+# Runs the whole suite against the pinned Gitea and newer releases, then reports what an upgrade
+# would change: tests that break, and known bugs that are fixed upstream (their strict xfail passes).
+# Only the pinned version can fail this workflow; the others are informational.
+on:
+  schedule:
+    - cron: "0 4 * * 1"          # Mondays 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: "Gitea versions to test, as a JSON list (the first is the pinned one)"
+        default: '["1.22.6", "28.2.0"]'
+  pull_request:
+    paths: [docker-compose.yml, .github/workflows/gitea-compat.yml]
+
+env:
+  PYTHON_VERSION: "3.12"
+  PINNED: "1.22.6"
+
+jobs:
+  suite:
+    name: Suite on Gitea ${{ matrix.gitea }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gitea: ${{ fromJSON(github.event.inputs.versions || '["1.22.6", "28.2.0"]') }}
+    continue-on-error: ${{ matrix.gitea != '1.22.6' }}
+    env:
+      GITEA_VERSION: ${{ matrix.gitea }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - name: Start Gitea ${{ matrix.gitea }} + PostgreSQL
+        run: docker compose up -d --quiet-pull
+      - run: pip install -r requirements.txt
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+      - run: python -m playwright install --with-deps chromium
+      - run: bash scripts/bootstrap.sh
+      - name: Suite (parallel)
+        run: pytest -m "not unit and not serial and not visual" -n auto --junitxml=results/regression.xml
+      - name: Whole-database integrity rules
+        if: success() || failure()
+        run: pytest -m serial --junitxml=results/integrity.xml
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: junit-gitea-${{ matrix.gitea }}
+          path: results
+
+  report:
+    name: Compatibility report
+    needs: suite
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "${{ env.PYTHON_VERSION }}" }
+      - uses: actions/download-artifact@v5
+        with: { pattern: junit-gitea-*, path: junit }
+      - name: Compare versions
+        run: |
+          args=$(ls -d junit/junit-gitea-* | sort -V | sed -E 's|^junit/junit-gitea-(.*)$|\1=&|')
+          python scripts/compat_report.py $args | tee compat.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: compatibility-report
+          path: compat.md

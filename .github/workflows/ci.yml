@@ -22,10 +22,58 @@ jobs:
       - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
-      - run: pytest tests/unit -m unit --junitxml=results/unit.xml
+      - name: Unit tests with branch coverage (fails under 90 %, see .coveragerc)
+        run: >
+          pytest tests/unit -m unit --junitxml=results/unit.xml
+          --cov --cov-report=term-missing --cov-report=xml:results/coverage.xml
+          --cov-report=markdown:results/coverage.md
       - name: Run summary
         if: always()
-        run: python scripts/ci_summary.py results/unit.xml >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          python scripts/ci_summary.py results/unit.xml >> "$GITHUB_STEP_SUMMARY"
+          if [ -f results/coverage.md ]; then
+            { echo "### Framework coverage"; echo; cat results/coverage.md; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: coverage
+          path: results/coverage.xml
+
+  mutation:
+    name: Mutation testing (do the unit tests notice small code changes?)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt mutmut==3.8.0
+      - name: Mutate the framework's logic and re-run the unit tests against every mutant
+        run: mutmut run --max-children 4 && mutmut export-cicd-stats
+      - name: Mutation score (fails under 90 %)
+        run: |
+          python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90 | tee -a "$GITHUB_STEP_SUMMARY"
+          { echo "<details><summary>Surviving mutants</summary>"; echo; echo '```';
+            mutmut results 2>/dev/null; echo '```'; echo "</details>"; } >> "$GITHUB_STEP_SUMMARY"
+          python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90 > /dev/null
+
+  visual:
+    name: Visual regression (pinned Playwright container)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start Gitea + PostgreSQL and create the admin user
+        run: bash scripts/bootstrap.sh
+      # Same image locally and in CI, so fonts and rendering are identical and baselines are portable.
+      - name: Compare 8 screens with tests/visual/baseline/<gitea version>/
+        run: make visual
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: visual-diffs
+          path: test-results/visual
 
   e2e:
     name: UI + API + DB + security + accessibility
@@ -56,7 +104,7 @@ jobs:
 
       - name: Full regression suite (parallel)
         run: >
-          pytest -m "$E2E_MARKERS and not smoke and not serial" -n auto
+          pytest -m "$E2E_MARKERS and not smoke and not serial and not visual" -n auto
           --alluredir=allure-results --junitxml=results/regression.xml
           --screenshot=only-on-failure --output=test-results
 

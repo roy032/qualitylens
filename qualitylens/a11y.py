@@ -33,8 +33,8 @@ class Violation:
 
 
 def scan(page) -> list[Violation]:
-    raw = _axe.run(page, options=WCAG_AA).response
-    return parse(raw)
+    raw = _axe.run(page, options=WCAG_AA).response  # pragma: no mutate (needs a browser; covered by tests/a11y)
+    return parse(raw)  # pragma: no mutate
 
 
 def parse(raw: dict) -> list[Violation]:

@@ -1,11 +1,13 @@
 pytest==9.1.1
 pytest-playwright==0.10.0
 pytest-xdist==3.8.0
+pytest-cov==7.1.0
 playwright==1.56.0
 requests==2.34.2
 psycopg[binary]==3.3.6
 jsonschema==4.26.0
 axe-playwright-python==0.1.8
+pillow==13.0.0
 allure-pytest==2.16.2
 locust==2.46.7
 anthropic==1.13.0

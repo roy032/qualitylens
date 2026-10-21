@@ -9,3 +9,9 @@ load/results/
 .env
 runs/
 results/
+mutants/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+compat/
