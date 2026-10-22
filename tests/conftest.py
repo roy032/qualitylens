@@ -5,15 +5,24 @@ so UI tests spend their time on the behaviour under test, not on setup.
 """
 from __future__ import annotations
 
+import os
+
 import allure
 import pytest
 import requests
+from hypothesis import settings as hypothesis_settings
 
 from pages.login_page import LoginPage
 from qualitylens.api_client import GiteaApi
 from qualitylens.config import settings
 from qualitylens.data import new_user_payload, unique
 from qualitylens.db import Database
+
+# Property-based tests (tests/api/test_properties.py). "ci": same examples on every run, so a red build
+# is reproducible and never a coin toss; "deep": random seeds and ten times the examples (make fuzz).
+hypothesis_settings.register_profile("ci", max_examples=40, derandomize=True, deadline=None, print_blob=True)
+hypothesis_settings.register_profile("deep", max_examples=400, deadline=None, print_blob=True)
+hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "ci"))
 
 
 def pytest_addoption(parser):

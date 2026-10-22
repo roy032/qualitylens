@@ -1,5 +1,5 @@
 # Shortcuts. Each target is one command you could also type yourself.
-.PHONY: install run up down test fast smoke ui api db security a11y unit coverage mutation load evidence report ai-eval flake-hunt visual visual-update
+.PHONY: install run up down test fast smoke ui api db security a11y property fuzz cross-browser unit coverage mutation load evidence report ai-eval flake-hunt visual visual-update
 
 install:            ## Python deps + browser
 	pip install -r requirements.txt
@@ -28,6 +28,13 @@ db:    ; pytest -m db
 security: ; pytest -m security
 a11y:  ; pytest -m a11y
 unit:  ; pytest -m unit
+property: ; pytest -m property -n auto
+
+fuzz:               ## property-based API tests with random seeds and 10x the examples (CI uses a fixed seed)
+	HYPOTHESIS_PROFILE=deep pytest -m property -n auto
+
+cross-browser:      ## UI suite on Firefox and WebKit (needs: python -m playwright install firefox webkit)
+	pytest -m "ui and not visual" --browser firefox --browser webkit -n auto
 
 coverage:           ## unit tests with branch coverage of the framework (fails under 90 %, see .coveragerc)
 	pytest tests/unit -m unit --cov --cov-report=term-missing --cov-report=html
@@ -41,6 +48,7 @@ load:               ## 60 s load test with pass/fail thresholds
 	mkdir -p load/results
 	locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
 	       --csv load/results/run --html load/results/report.html --only-summary
+	python scripts/load_trend.py load/results/run_stats.csv --history load/history/history.json
 
 evidence:           ## re-run every bug reproduction and refresh bug-reports/evidence
 	python scripts/capture_evidence.py

@@ -1,6 +1,6 @@
 # Bug reports
 
-Ten defects found in Gitea 1.22.6 while building this suite. Every one is reproducible from a clean
+Twelve defects found in Gitea 1.22.6 while building this suite. Every one is reproducible from a clean
 install with `python scripts/capture_evidence.py`, which writes the HTTP logs and screenshots in
 [`evidence/`](evidence/), and each is pinned by an automated test marked `known_bug` (strict `xfail`):
 the build stays green while the bug exists and turns red the moment it is fixed, so the test can be
@@ -18,13 +18,15 @@ promoted to a normal regression test.
 | [BUG-008](BUG-008-blank-milestone-title.md) | Milestones can be created with an empty or whitespace-only title | Minor | P3 | Negative API testing | `test_milestones_api.py::test_milestone_title_required` |
 | [BUG-009](BUG-009-unknown-ids-silently-dropped.md) | Unknown milestone or label IDs are silently dropped on issue create | Minor | P3 | Negative API testing | `test_milestones_api.py::test_issue_with_unknown_reference_rejected` |
 | [BUG-010](BUG-010-search-like-wildcards.md) | Search treats `%` and `_` as SQL wildcards | Minor | P3 | Security testing (SQL metacharacters) | `test_repos_api.py::test_search_treats_wildcards_literally` |
+| [BUG-011](BUG-011-nul-character-500.md) | A NUL character crashes six endpoints with a 500 and leaks the database error | Major | P2 | **Property-based testing** (Hypothesis) | `test_properties.py::test_nul_character_rejected_cleanly` |
+| [BUG-012](BUG-012-edit-title-not-validated.md) | Editing an issue title skips the rules applied on create | Minor | P3 | **Model-based testing** (Hypothesis state machine) | `test_properties.py::test_edit_title_follows_create_rules` |
 
 **Severity** is the impact on the user or data (Critical, Major, Minor, Trivial).
 **Priority** is how soon it should be fixed (P1 now ... P4 when convenient).
 
 ## Triage (20 Oct 2026)
 
-All ten are defects in Gitea's server, not in QualityLens: each test asserts the documented or reasonable
+All twelve are defects in Gitea's server, not in QualityLens: each test asserts the documented or reasonable
 behaviour and the server answers differently. Nothing in this repository can fix them, so they stay pinned as
 strict `xfail`. To see whether they are still open upstream, the suite and `capture_evidence.py` were re-run on
 a clean install of the latest Gitea release, **28.2.0**
@@ -42,6 +44,8 @@ a clean install of the latest Gitea release, **28.2.0**
 | BUG-008 | reproduces | reproduces | Open upstream (found 21 Oct 2026) |
 | BUG-009 | reproduces | reproduces | Open upstream (found 21 Oct 2026) |
 | BUG-010 | reproduces | reproduces | Open upstream (found 21 Oct 2026) |
+| BUG-011 | reproduces | reproduces | Open upstream (found 22 Oct 2026) |
+| BUG-012 | reproduces | reproduces | Open upstream (found 22 Oct 2026) |
 
 The suite stays pinned to 1.22.6. On 28.2.0, 14 other tests fail. Most are version drift to handle in a
 later upgrade: changed login and repository UI markup (10 UI tests) and changed status codes for duplicate

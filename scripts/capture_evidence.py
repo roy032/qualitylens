@@ -175,6 +175,30 @@ def main():
     for name in names:
         api.delete_repo(OWNER, name)
 
+    # BUG-011 NUL character reaches PostgreSQL
+    log = Log("BUG-011")
+    nul = "before\x00after"
+    n = api._ok(api.create_issue(OWNER, repo, "NUL target"))["number"]
+    log.call(api.create_issue(OWNER, repo, nul), "Create issue whose title contains U+0000")
+    log.call(api.create_issue(OWNER, repo, "t", body=nul), "Same character in the issue body")
+    log.call(api.add_comment(OWNER, repo, n, nul), "In a comment")
+    log.call(api.create_milestone(OWNER, repo, nul), "In a milestone title")
+    log.call(api.create_label(OWNER, repo, nul), "In a label name")
+    log.call(api.get("/repos/search", params={"q": nul}), "As a repository search keyword")
+    log.call(api.create_issue(OWNER, repo, "before\x01after"), "For comparison: U+0001 is accepted",
+             ("number", "title"))
+    log.save()
+
+    # BUG-012 editing an issue title skips the create-time rules
+    log = Log("BUG-012")
+    r = log.call(api.create_issue(OWNER, repo, "  padded  "), "Create: the title is trimmed", ("number", "title"))
+    n = r.json()["number"]
+    log.call(api.edit_issue(OWNER, repo, n, title="  padded  "), "Edit to the same text: stored untrimmed",
+             ("number", "title"))
+    log.call(api.edit_issue(OWNER, repo, n, title="   "), "Edit to three spaces: accepted", ("number", "title"))
+    log.call(api.create_issue(OWNER, repo, ""), "For comparison: create rejects an empty title")
+    log.save()
+
     print(f"Evidence repository left in place for inspection: {settings.base_url}/{OWNER}/{repo}")
 
 

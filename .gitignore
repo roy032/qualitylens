@@ -15,3 +15,5 @@ mutants/
 coverage.xml
 htmlcov/
 compat/
+.hypothesis/
+load/history/
