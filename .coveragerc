@@ -1,0 +1,17 @@
+# Coverage of the framework's own logic, measured by the offline unit suite.
+# Modules that only make sense against a running Gitea (API client, DB helper, evidence capture)
+# or need an API key (ai/generate.py) are exercised by the e2e jobs instead, so they are left out.
+[run]
+source = qualitylens, ai, scripts
+branch = true
+omit =
+    qualitylens/api_client.py
+    qualitylens/db.py
+    qualitylens/data.py
+    ai/generate.py
+    scripts/capture_evidence.py
+
+[report]
+fail_under = 90
+show_missing = true
+skip_empty = true

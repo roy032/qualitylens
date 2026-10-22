@@ -57,3 +57,27 @@ def test_contract_checks_timestamps():
     milestone = {"id": 1, "title": "m", "state": "open", "open_issues": 0, "closed_issues": 0, "due_on": "tomorrow"}
     assert [e.split(":")[0] for e in schemas.contract_errors(milestone, schemas.MILESTONE)] == ["due_on"]
     assert schemas.contract_errors({**milestone, "due_on": None}, schemas.MILESTONE) == []
+
+
+# Added after mutation testing (make mutation): these details of the report were not pinned down.
+def test_parse_details():
+    raw = {"violations": [{"id": "region", "help": "Landmarks", "helpUrl": "https://x/region",
+                           "nodes": [{"target": ["iframe", "#inner"]}]}]}
+    assert a11y.parse(raw) == [a11y.Violation("region", "unknown", "Landmarks", "https://x/region", ("iframe #inner",))]
+    assert a11y.parse({}) == []
+
+
+@pytest.mark.parametrize("count, expected", [
+    (3, "#t0, #t1, #t2"), (4, "#t0, #t1, #t2 ..."),
+])
+def test_describe_lists_at_most_three_targets(count, expected):
+    v = a11y.Violation("label", "critical", "Labels", "https://x", tuple(f"#t{i}" for i in range(count)))
+    assert v.describe() == f"[critical] label: Labels ({count} element(s): {expected}) https://x"
+
+
+def test_contract_errors_name_the_nested_path():
+    schema = {"type": "object", "properties": {"owner": {"type": "object", "properties": {
+        "tags": schemas.list_of({"type": "string"})}}}}
+    assert schemas.contract_errors({"owner": {"tags": ["a", 7]}}, schema) == ["owner/tags/1: 7 is not of type 'string'"]
+    assert schemas.contract_errors({"owner": {"tags": "a"}}, schema) == ["owner/tags: 'a' is not of type 'array'"]
+    assert schemas.contract_errors([], schema) == ["<root>: [] is not of type 'object'"]

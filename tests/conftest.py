@@ -16,6 +16,11 @@ from qualitylens.data import new_user_payload, unique
 from qualitylens.db import Database
 
 
+def pytest_addoption(parser):
+    parser.addoption("--update-snapshots", action="store_true",
+                     help="visual tests: save the current screenshots as the new baselines")
+
+
 def pytest_collection_modifyitems(session, config, items):
     """Fail fast with a clear message if the app is not running (skipped for offline unit tests)."""
     if not any(item.get_closest_marker(m) for item in items for m in ("ui", "api", "db", "security", "a11y")):

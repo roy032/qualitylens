@@ -27,4 +27,11 @@ Observation: the issue-list API is about 4x slower than reading a repository eve
 issues. It is the endpoint to watch first if the data set grows; a follow-up run with 10,000 seeded issues
 would show whether it scales with the number of issues.
 
+## CI
+
+GitHub's shared runners are slower and noisier than the baseline VM: on 21 Oct 2026 runs of the same
+commit measured p95 between 720 and 860 ms, driven by `GET /issues` (p95 1.4 to 1.6 s, slowing as the
+scenario keeps adding issues). The CI job therefore sets `QL_MAX_P95_MS=1200`, which still fails on a
+~1.5x slowdown there; local runs keep 800 ms.
+
 Results land in `load/results/` (CSV per endpoint and an HTML report); CI uploads them as an artifact.
