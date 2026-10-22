@@ -97,10 +97,10 @@ pytest --alluredir=allure-results
 A walkthrough for showing the project to someone, after `make up`:
 
 1. **The app.** Open http://localhost:3000 and sign in as `qa_admin`. This is the system under test.
-2. **Manual design.** Open [test-cases/manual_test_cases.csv](test-cases/manual_test_cases.csv): 48 cases, each
+2. **Manual design.** Open [test-cases/manual_test_cases.csv](test-cases/manual_test_cases.csv): 76 cases, each
    naming the automated test that covers it. Run `pytest -m unit -q` to show the traceability check.
 3. **Smoke, then everything.** `pytest -m smoke -q` (seconds), then `make fast`: about a minute on
-   every CPU core, 268 passed and 13 xfailed (`make test` runs the same suite on one core in about two). Add `--headed -m ui` to watch the browser tests drive Gitea.
+   every CPU core, 166 passed and 13 xfailed, then the 7 integrity rules (`make test` runs the same suite on one core in about two). Add `--headed -m ui` to watch the browser tests drive Gitea.
 4. **A bug, live.** `pytest -m known_bug -rA` lists the ten pinned defects. Reproduce one by hand:
 
    ```bash
@@ -143,7 +143,7 @@ qualitylens/visual.py     pixel comparison with tolerance, diff image with chang
 sql/integrity_checks.sql  data-integrity rules, also runnable by hand in psql
 load/                     Locust scenario with SLO thresholds, baseline results
 test-cases/               manual test cases (CSV, opens in Excel)
-bug-reports/              7 bug reports + evidence/ (HTTP logs, screenshots)
+bug-reports/              10 bug reports + evidence/ (HTTP logs, screenshots)
 scripts/capture_evidence.py  reproduces every bug from scratch and refreshes evidence/
 ai/                       story -> test cases (generate.py), comparison (evaluate.py), sample output + review
 docs/test-plan.md         STLC test plan: scope, techniques, entry/exit criteria
@@ -160,16 +160,29 @@ docs/gitea-compatibility.md  upgrade report: Gitea 1.22.6 vs 28.2.0
 
 ## Coverage summary
 
-| Feature | Manual | UI | API | DB | Notes |
-|---|---|---|---|---|---|
-| Login / logout | 7 | 8 | | | No account enumeration, masked password, session really ends |
-| API authentication and authorisation | 2 | | 8 | | Bad credentials, invalid token, read-only token scope, non-admin blocked |
-| Registration / users | 10 | 7 | 13 | 1 | Boundaries: 8-char password, 40-char username; case-insensitive email |
-| Repositories | 6 | 7 | 12 | 2 | Name rules, 100-char limit, private repo hidden from anonymous users |
-| Issues and comments | 18 | 7 | 24 | 3 | 255-char title, Unicode, XSS/SQL strings, state filter, pagination |
-| Labels | 1 | | 6 | | Colour validation, duplicates |
-| Data integrity | 4 | | | 7 rules | Counters, orphans, timestamps, primary email, lower-case names |
-| **Total** | **48** | **29** | **63** | **13** | plus 57 offline unit and traceability tests |
+Manual cases per feature (`test-cases/manual_test_cases.csv`):
+
+| Feature | Cases | Feature | Cases |
+|---|---:|---|---:|
+| Issues | 18 | Security | 10 |
+| Registration | 10 | Login | 7 |
+| Repositories | 6 | API authentication | 6 |
+| Milestones | 5 | Visual | 5 |
+| Database integrity | 4 | Accessibility | 3 |
+| Comments | 2 | **Total** | **76** |
+
+Automated tests per layer (v1.0 run on Gitea 1.22.6):
+
+| Layer | Tests | Highlights |
+|---|---:|---|
+| UI (Playwright, Page Objects) | 29 | Login and logout, registration rules, repository and issue flows |
+| API (requests + JSON Schema) | 88 | Boundaries, negative cases, response contracts, milestones, comments; 13 pin known bugs |
+| Database (SQL) | 13 | 7 whole-database integrity rules plus per-feature consistency checks |
+| Security | 43 | Access control between two users, stored XSS, Markdown sanitiser, CSRF, cookies, clickjacking, injection |
+| Accessibility (axe-core) | 13 | WCAG 2.1 AA on 9 screens against a baseline, keyboard-only sign-in, labelled fields |
+| Visual | 9 | 8 screens against approved screenshots, plus a check that a small change is caught |
+| Offline unit and traceability | 140 | Framework logic (96 % coverage, 96 % mutation score) and manual-to-automated links |
+| **Total** | **335** | |
 
 Every manual case names the automated test that covers it, and `tests/unit/test_traceability.py` fails
 the build if a referenced test is renamed or deleted.
@@ -185,6 +198,9 @@ the build if a referenced test is renamed or deleted.
 | [BUG-005](bug-reports/BUG-005-unknown-state-filter-ignored.md) | Unknown `state` filter silently ignored | Minor |
 | [BUG-006](bug-reports/BUG-006-malformed-json-error.md) | Malformed JSON gives 422 and a misleading message | Trivial |
 | [BUG-007](bug-reports/BUG-007-whitespace-comment.md) | Whitespace-only comment accepted (found by the AI layer) | Minor |
+| [BUG-008](bug-reports/BUG-008-blank-milestone-title.md) | Milestones accept an empty or whitespace-only title | Minor |
+| [BUG-009](bug-reports/BUG-009-unknown-ids-silently-dropped.md) | Unknown milestone or label IDs silently dropped on issue create | Minor |
+| [BUG-010](bug-reports/BUG-010-search-like-wildcards.md) | Search treats `%` and `_` as SQL wildcards (not injection) | Minor |
 
 Each is pinned by a test marked `known_bug` with `xfail(strict=True)`: the build stays green while the bug
 exists and fails as soon as Gitea fixes it, which is the signal to turn it into a normal regression test.
