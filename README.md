@@ -218,7 +218,7 @@ second story ready to run.
    Any unexpected failure, or a known bug that starts passing, fails the build. Builds the Allure report
    (artifact on every run; also published to GitHub Pages on `main` when Pages is set to "GitHub Actions"
    and the repository variable `PUBLISH_PAGES` is `true`).
-3. **load**: 60 s Locust run; fails on more than 1 % errors or p95 above 800 ms.
+3. **load**: 60 s Locust run; fails on more than 1 % errors or p95 above 1200 ms (800 ms locally; shared CI runners are slower, see [load/README.md](load/README.md#ci)).
 4. **ai-eval**: regenerates cases if an `ANTHROPIC_API_KEY` secret exists, then evaluates them.
 
 Two scheduled workflows complete the picture: `flake-hunt.yml` (the suite 3 times, any changed result

@@ -206,7 +206,11 @@ jobs:
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - run: bash scripts/bootstrap.sh
-      - name: 60 s at 20 users; fails if error rate > 1% or p95 > 800 ms
+      # Shared 2-vCPU runners measure p95 at 720-860 ms for the same code (about 4x the 180 ms baseline
+      # on a 4 vCPU VM), so 800 ms failed at random. 1200 ms still catches a ~1.5x slowdown here.
+      - name: 60 s at 20 users; fails if error rate > 1% or p95 > 1200 ms
+        env:
+          QL_MAX_P95_MS: "1200"
         run: |
           mkdir -p load/results
           locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
