@@ -1,0 +1,53 @@
+{
+  "gitea_version": "1.22.6",
+  "standard": "WCAG 2.1 A/AA (axe-core tags wcag2a, wcag2aa, wcag21a, wcag21aa)",
+  "note": "Rules that already fail on these pages in Gitea 1.22.6, explained in docs/accessibility.md. Remove a rule once it is fixed; only add one together with an entry in that document.",
+  "pages": {
+    "login": [
+      "aria-required-children",
+      "color-contrast"
+    ],
+    "register": [
+      "aria-required-children",
+      "color-contrast"
+    ],
+    "explore": [
+      "aria-required-children",
+      "color-contrast"
+    ],
+    "dashboard": [
+      "aria-required-children",
+      "color-contrast"
+    ],
+    "new-repository": [
+      "aria-input-field-name",
+      "aria-required-children",
+      "color-contrast",
+      "label"
+    ],
+    "repository-home": [
+      "aria-required-children",
+      "button-name",
+      "color-contrast",
+      "label",
+      "link-name"
+    ],
+    "issue-list": [
+      "aria-required-children",
+      "color-contrast"
+    ],
+    "new-issue": [
+      "aria-allowed-attr",
+      "aria-required-children",
+      "button-name",
+      "color-contrast"
+    ],
+    "issue": [
+      "aria-allowed-attr",
+      "aria-required-children",
+      "button-name",
+      "color-contrast",
+      "label"
+    ]
+  }
+}

@@ -11,6 +11,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"
+  E2E_MARKERS: "(ui or api or db or security or a11y)"
 
 jobs:
   unit:
@@ -21,45 +22,100 @@ jobs:
       - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
-      - run: pytest tests/unit -m unit
+      - run: pytest tests/unit -m unit --junitxml=results/unit.xml
+      - name: Run summary
+        if: always()
+        run: python scripts/ci_summary.py results/unit.xml >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
-    name: UI + API + DB tests
+    name: UI + API + DB + security + accessibility
     needs: unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+
+      - name: Start Gitea + PostgreSQL (warms up while dependencies install)
+        run: docker compose up -d --quiet-pull
+
       - run: pip install -r requirements.txt
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
       - run: python -m playwright install --with-deps chromium
 
-      - name: Start Gitea + PostgreSQL
+      - name: Wait for the app and create the admin user
         run: bash scripts/bootstrap.sh
 
       - name: Smoke tests (stop early if the basics are broken)
-        run: pytest -m smoke --alluredir=allure-results
+        run: pytest -m smoke -n auto --alluredir=allure-results --junitxml=results/smoke.xml
 
-      - name: Full regression suite
-        run: pytest -m "(ui or api or db) and not smoke" --alluredir=allure-results --screenshot=only-on-failure --output=test-results
+      - name: Full regression suite (parallel)
+        run: >
+          pytest -m "$E2E_MARKERS and not smoke and not serial" -n auto
+          --alluredir=allure-results --junitxml=results/regression.xml
+          --screenshot=only-on-failure --output=test-results
+
+      - name: Whole-database integrity rules (alone, after every other test has written its data)
+        if: success() || failure()
+        run: pytest -m serial --alluredir=allure-results --junitxml=results/integrity.xml
+
+      - name: Run summary
+        if: always()
+        run: python scripts/ci_summary.py results/*.xml >> "$GITHUB_STEP_SUMMARY"
+
+      # Allure trend charts need the history/ folder of the previous report.
+      - name: Restore Allure history
+        if: always()
+        uses: actions/cache/restore@v4
+        with:
+          path: allure-history
+          key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            allure-history-${{ github.ref_name }}-
+            allure-history-main-
 
       - name: Build Allure report
         if: always()
         run: |
           mkdir -p allure-results
+          if [ -d allure-history/history ]; then cp -r allure-history/history allure-results/; fi
           cat > allure-results/environment.properties <<PROPS
           Gitea=${GITEA_VERSION:-1.22.6}
           Database=PostgreSQL 16
           Browser=Chromium (Playwright)
           Commit=${{ github.sha }}
           PROPS
+          cat > allure-results/executor.json <<JSON
+          {"name": "GitHub Actions", "type": "github", "buildName": "Run #${{ github.run_number }}",
+           "buildOrder": ${{ github.run_number }},
+           "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}
+          JSON
           npx --yes allure-commandline@2.30.0 generate allure-results -o allure-report --clean
+          mkdir -p allure-history && rm -rf allure-history/history && cp -r allure-report/history allure-history/
+
+      - name: Save Allure history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: allure-history
+          key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: allure-report
           path: allure-report
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: junit-results
+          path: results
 
       - uses: actions/upload-artifact@v5
         if: failure()
@@ -94,7 +150,7 @@ jobs:
 
   load:
     name: Load test (Locust)
-    needs: e2e
+    needs: unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

@@ -22,7 +22,7 @@ from qualitylens.api_client import GiteaApi  # noqa: E402
 from qualitylens.config import settings  # noqa: E402
 from qualitylens.data import new_user_payload, unique  # noqa: E402
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "bug-reports" / "evidence"
+OUT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "bug-reports" / "evidence"
 OWNER = settings.admin_user
 api = GiteaApi(auth=(settings.admin_user, settings.admin_password))
 
@@ -59,7 +59,11 @@ class Log:
 
     def save(self):
         self.path.write_text("\n".join(line for line in self.lines if line is not None))
-        print("wrote", self.path.relative_to(ROOT))
+        print("wrote", shown(self.path))
+
+
+def shown(path: Path) -> str:
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
 
 
 def screenshot(url: str, path: Path, clip_selector: str | None = None):
@@ -74,7 +78,7 @@ def screenshot(url: str, path: Path, clip_selector: str | None = None):
         target = page.locator(clip_selector).first if clip_selector else page
         target.screenshot(path=str(path))
         browser.close()
-    print("wrote", path.relative_to(ROOT))
+    print("wrote", shown(path))
 
 
 def main():
@@ -134,6 +138,42 @@ def main():
     log.call(api.add_comment(OWNER, repo, n, ""), "For comparison: an empty comment is rejected")
     log.save()
     screenshot(f"{settings.base_url}/{OWNER}/{repo}/issues/{n}", OUT / "BUG-007.png", ".issue-content-left")
+
+    # BUG-008 blank milestone titles
+    log = Log("BUG-008")
+    for title in ("", "   "):
+        log.call(api.create_milestone(OWNER, repo, title), f"Create milestone with title {title!r}", ("id", "title", "state"))
+    log.call(api.post(f"{base}/milestones", json={"description": "no title field at all"}),
+             "Create milestone without a title field", ("id", "title", "state"))
+    log.call(api.get(f"{base}/milestones"), "List milestones: three with an empty title", ("id", "title"))
+    log.call(api.create_issue(OWNER, repo, ""), "For comparison: issues reject an empty title")
+    log.save()
+    screenshot(f"{settings.base_url}/{OWNER}/{repo}/milestones", OUT / "BUG-008.png", ".milestone-list")
+
+    # BUG-009 unknown milestone / label IDs silently dropped
+    log = Log("BUG-009")
+    log.call(api.create_issue(OWNER, repo, "Linked to milestone 999999", milestone=999999),
+             "Create issue linked to a milestone that does not exist", ("number", "title", "milestone"))
+    log.call(api.create_issue(OWNER, repo, "Labelled 999999", labels=[999999]),
+             "Create issue with a label that does not exist", ("number", "title", "labels"))
+    log.call(api.get_milestone(OWNER, repo, 999999), "For comparison: the milestone itself is 404")
+    log.save()
+
+    # BUG-010 search keyword used as a LIKE pattern
+    log = Log("BUG-010")
+    names = [unique("wild"), unique("wild"), unique("plain")]
+    for name in names:
+        api._ok(api.create_repo(name))
+    log.note("Repositories created: " + ", ".join(names))
+    for query, note in (("w_ld", "Search for the literal text 'w_ld' (no name contains it)"),
+                        ("%", "Search for '%' (no name contains it)")):
+        r = api.get("/repos/search", params={"q": query, "limit": 50})
+        log.note(f"# {note}\n> GET {r.url}\n< {r.status_code}\n< names: {[x['name'] for x in r.json()['data']]}")
+    r = api.get("/users/search", params={"q": "_"})
+    log.note(f"# Same in user search, q='_'\n> GET {r.url}\n< {r.status_code}\n< logins: {[x['login'] for x in r.json()['data']]}")
+    log.save()
+    for name in names:
+        api.delete_repo(OWNER, name)
 
     print(f"Evidence repository left in place for inspection: {settings.base_url}/{OWNER}/{repo}")
 

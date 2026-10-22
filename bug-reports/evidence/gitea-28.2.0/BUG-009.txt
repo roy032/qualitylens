@@ -1,0 +1,19 @@
+BUG-009 evidence. Gitea 28.2.0, http://localhost:3000
+
+# Create issue linked to a milestone that does not exist
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-7d4d231e/issues
+> {"title": "Linked to milestone 999999", "milestone": 999999}
+< 201
+< {"number": 4, "title": "Linked to milestone 999999", "milestone": null}
+
+# Create issue with a label that does not exist
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-7d4d231e/issues
+> {"title": "Labelled 999999", "labels": [999999]}
+< 201
+< {"number": 5, "title": "Labelled 999999", "labels": []}
+
+# For comparison: the milestone itself is 404
+> GET http://localhost:3000/api/v1/repos/qa_admin/evidence-7d4d231e/milestones/999999
+
+< 404
+< {"message": "not found", "url": "http://localhost:3000/api/swagger"}

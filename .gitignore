@@ -7,3 +7,5 @@ allure-report/
 test-results/
 load/results/
 .env
+runs/
+results/

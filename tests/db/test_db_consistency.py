@@ -104,6 +104,7 @@ def test_email_stored_lowercase_unique(temp_user, db):
     assert len(rows) == 1
 
 
+@pytest.mark.serial  # a counter checked while another worker is mid-write would look broken
 @pytest.mark.parametrize("sql", RULES, ids=RULE_NAMES)
 @allure.title("Integrity rule holds across the whole database")
 def test_integrity_rule(db, sql):

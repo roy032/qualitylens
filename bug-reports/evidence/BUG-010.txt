@@ -1,0 +1,18 @@
+BUG-010 evidence. Gitea 1.22.6, http://localhost:3000
+
+Repositories created: wild-5a792ed5, wild-7cab1047, plain-0185f396
+
+# Search for the literal text 'w_ld' (no name contains it)
+> GET http://localhost:3000/api/v1/repos/search?q=w_ld&limit=50
+< 200
+< names: ['wild-5a792ed5', 'wild-7cab1047']
+
+# Search for '%' (no name contains it)
+> GET http://localhost:3000/api/v1/repos/search?q=%25&limit=50
+< 200
+< names: ['evidence-5741e199', 'plain-0185f396', 'wild-5a792ed5', 'wild-7cab1047']
+
+# Same in user search, q='_'
+> GET http://localhost:3000/api/v1/users/search?q=_
+< 200
+< logins: ['qa_admin']
