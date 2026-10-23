@@ -28,9 +28,7 @@ from pathlib import Path
 MANUAL_CSV = Path(__file__).parents[1] / "test-cases" / "manual_test_cases.csv"
 # Words that appear in almost every case and carry no meaning for matching. Words that flip meaning
 # ("empty", "invalid", "not", "reject") are deliberately NOT stopwords.
-STOPWORDS = set("""a an the and or of to in on for with is are be by as at it its this that from into
-then when should must user page shown show displayed field value enter entered click create created
-issue issues test case""".split())
+STOPWORDS = set(["a", "an", "the", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are", "be", "by", "as", "at", "it", "its", "this", "that", "from", "into", "then", "when", "should", "must", "user", "page", "shown", "show", "displayed", "field", "value", "enter", "entered", "click", "create", "created", "issue", "issues", "test", "case"])
 # Phrases that mean the same thing in test cases, mapped to one canonical word before comparing.
 SYNONYMS = [
     (r"not (signed|logged) in|without (being )?(signed|logged) in|without credentials|unauthenticated|anonymous",
@@ -98,7 +96,8 @@ def evaluate(ai: list[Case], manual: list[Case], match_at: float = 0.40, duplica
     vec = {c.id: vector(c) for c in ai + manual}
 
     # 1. Duplicates inside the AI output: a later case too similar to an earlier, kept case.
-    kept, duplicates = [], []
+    kept: list[Case] = []
+    duplicates: list[tuple[Case, Case, float]] = []
     for case in ai:
         twin = max(((k, similarity(case, k, vec)) for k in kept), key=lambda p: p[1], default=None)
         if twin and twin[1] >= duplicate_at:

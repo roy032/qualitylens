@@ -1,0 +1,26 @@
+name: Flaky test
+description: A test whose result changes between runs on the same code
+labels: [flaky]
+body:
+  - type: input
+    id: test
+    attributes:
+      label: Test id
+      placeholder: tests/ui/test_login.py::test_logout
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Flip rate and timeline from `qualitylens flaky` or the trends dashboard, links to failing runs.
+    validations: { required: true }
+  - type: textarea
+    id: cause
+    attributes:
+      label: Suspected cause
+  - type: checkboxes
+    id: quarantine
+    attributes:
+      label: Quarantine
+      options:
+        - label: Added to quarantine.toml with this issue's link, an owner and an expiry

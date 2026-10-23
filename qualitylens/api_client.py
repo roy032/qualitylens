@@ -6,6 +6,8 @@ setup itself breaks, which keeps test failures pointing at the real problem.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import requests
 
 from qualitylens.config import settings
@@ -40,7 +42,7 @@ class GiteaApi:
         return self.request("DELETE", path, **kw)
 
     @staticmethod
-    def _ok(resp: requests.Response, *expected: int) -> dict | list:
+    def _ok(resp: requests.Response, *expected: int) -> Any:  # decoded JSON: an object or a list
         expected = expected or (200, 201)
         assert resp.status_code in expected, (
             f"Setup call {resp.request.method} {resp.url} returned {resp.status_code}: {resp.text[:300]}")

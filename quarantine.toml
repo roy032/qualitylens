@@ -1,0 +1,12 @@
+# Flaky-test quarantine. A test listed here still runs in CI, in a separate step that cannot fail the
+# build, so its history keeps being recorded while someone fixes it. See CONTRIBUTING.md#flaky-tests.
+#
+# Every entry needs an owner, a reason and an expiry at most 30 days ahead; `qualitylens quarantine check`
+# (lint job) fails once it has expired, so a quarantine cannot quietly become permanent.
+#
+# [[test]]
+# id = "tests/ui/test_login.py::test_logout"   # pytest node id; without [params] it covers all of them
+# reason = "Logout redirect races the session cookie, about 1 run in 8"
+# owner = "roy032"
+# issue = "https://github.com/roy032/qualitylens/issues/12"
+# expires = 2026-11-30

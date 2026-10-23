@@ -17,3 +17,9 @@ htmlcov/
 compat/
 .hypothesis/
 load/history/
+test-history/
+dist/
+build/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/

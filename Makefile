@@ -1,9 +1,17 @@
 # Shortcuts. Each target is one command you could also type yourself.
-.PHONY: install run up down test fast smoke ui api db security a11y property fuzz cross-browser unit coverage mutation load evidence report ai-eval flake-hunt visual visual-update
+.PHONY: install install-dev run up down doctor test fast smoke ui api db security a11y property fuzz cross-browser unit impacted coverage mutation load evidence report ai-eval flake-hunt visual visual-update lint audit trends docker
 
-install:            ## Python deps + browser
+install:            ## Python deps + browser + the qualitylens command
 	pip install -r requirements.txt
+	pip install --no-deps -e .
 	python -m playwright install chromium
+
+install-dev: install ## + lint/type/audit tools and the pre-commit hooks
+	pip install -r requirements-dev.txt
+	pre-commit install
+
+doctor:             ## can this machine run the suite? says how to fix what is missing
+	python -m qualitylens doctor
 
 run:                ## one command: install, start Gitea, smoke, full suite, summary (Windows: scripts\run.ps1)
 	bash scripts/run.sh
@@ -18,8 +26,8 @@ test:               ## full suite with Allure results
 	pytest --alluredir=allure-results
 
 fast:               ## same suite on every CPU core, integrity rules last (how CI runs it)
-	pytest -m "not unit and not serial" -n auto --alluredir=allure-results
-	pytest -m serial --alluredir=allure-results
+	pytest -m "not unit and not serial and not quarantined" -n auto --alluredir=allure-results
+	pytest -m "serial and not quarantined" --alluredir=allure-results
 
 smoke: ; pytest -m smoke
 ui:    ; pytest -m ui
@@ -28,6 +36,25 @@ db:    ; pytest -m db
 security: ; pytest -m security
 a11y:  ; pytest -m a11y
 unit:  ; pytest -m unit
+
+impacted:           ## only the layers your branch can affect (vs origin/main), see qualitylens/impact.py
+	python -m qualitylens run impacted
+
+lint:               ## ruff + mypy + quarantine check (what the CI lint job runs)
+	ruff check .
+	mypy
+	python -m qualitylens quarantine check
+
+audit:              ## known vulnerabilities in the pinned dependencies
+	pip-audit -r requirements.txt --strict
+
+trends:             ## record results/*.xml in the test history, report flaky tests, write the dashboard
+	python -m qualitylens history add results/*.xml
+	python -m qualitylens flaky
+	python -m qualitylens dashboard --out test-history/trends.html
+
+docker:             ## build the suite image (docker run --rm --network host qualitylens doctor)
+	docker build -t qualitylens .
 property: ; pytest -m property -n auto
 
 fuzz:               ## property-based API tests with random seeds and 10x the examples (CI uses a fixed seed)
