@@ -1,6 +1,6 @@
 """Track load-test results across runs and flag a slowdown relative to recent history.
 
-    python scripts/load_trend.py load/results/run_stats.csv --history load/history/history.json \
+    qualitylens load-trend load/results/run_stats.csv --history load/history/history.json \
            --label "$GITHUB_SHA" [--max-regression 50] [--keep 30] >> "$GITHUB_STEP_SUMMARY"
 
 The fixed SLO in load/locustfile.py (p95 under 1200 ms in CI) only catches a large slowdown, because

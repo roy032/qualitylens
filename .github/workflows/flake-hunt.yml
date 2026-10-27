@@ -33,7 +33,7 @@ jobs:
           done
       - name: Compare runs (fails when any test is flaky)
         shell: bash  # adds pipefail, so the summary's exit code survives the pipe to tee
-        run: python scripts/ci_summary.py --runs runs/run-*.xml | tee -a "$GITHUB_STEP_SUMMARY"
+        run: python -m qualitylens summary --runs runs/run-*.xml | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: always()
         with:

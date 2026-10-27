@@ -1,6 +1,6 @@
 """Compare the same suite run against several Gitea versions: an upgrade-readiness report.
 
-    python scripts/compat_report.py 1.22.6=results-1.22.6 28.2.0=results-28.2.0 > compat.md
+    qualitylens compat 1.22.6=results-1.22.6 28.2.0=results-28.2.0 > compat.md
 
 Each argument is VERSION=PATH, where PATH is a JUnit XML file or a folder of them (one run per
 version). The report lists, per version, the totals per outcome and which known bugs still
@@ -13,11 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    from qualitylens.junit import OUTCOMES, Result, parse
-except ImportError:  # run as a script from another directory: python scripts/compat_report.py
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from qualitylens.junit import OUTCOMES, Result, parse
+from qualitylens.junit import OUTCOMES, Result, parse
 
 BUG_ID = re.compile(r"BUG-\d+")
 

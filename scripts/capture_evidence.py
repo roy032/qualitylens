@@ -18,9 +18,9 @@ sys.path.insert(0, str(ROOT))
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
-from qualitylens.api_client import GiteaApi  # noqa: E402
-from qualitylens.config import settings  # noqa: E402
-from qualitylens.data import new_user_payload, unique  # noqa: E402
+from suite.api_client import GiteaApi  # noqa: E402
+from suite.config import settings  # noqa: E402
+from suite.data import new_user_payload, unique  # noqa: E402
 
 OUT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "bug-reports" / "evidence"
 OWNER = settings.admin_user

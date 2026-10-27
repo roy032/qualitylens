@@ -14,7 +14,7 @@ from playwright.sync_api import expect
 
 from pages.login_page import LoginPage
 from qualitylens import a11y
-from qualitylens.config import settings
+from suite.config import settings
 
 pytestmark = [pytest.mark.a11y, pytest.mark.ui, allure.feature("Accessibility")]
 OWNER = settings.admin_user

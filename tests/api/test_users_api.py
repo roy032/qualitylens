@@ -2,7 +2,7 @@
 import allure
 import pytest
 
-from qualitylens.data import new_user_payload
+from suite.data import new_user_payload
 
 pytestmark = [pytest.mark.api, allure.feature("API: Users")]
 

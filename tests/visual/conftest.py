@@ -3,7 +3,7 @@ import os
 import pytest
 import requests
 
-from qualitylens.config import settings
+from suite.config import settings
 
 
 def pytest_collection_modifyitems(config, items):

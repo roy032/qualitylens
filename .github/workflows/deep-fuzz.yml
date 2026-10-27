@@ -27,4 +27,4 @@ jobs:
         run: pytest -m property -n auto --junitxml=results/fuzz.xml
       - name: Run summary
         if: always()
-        run: python scripts/ci_summary.py results/fuzz.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python -m qualitylens summary results/fuzz.xml >> "$GITHUB_STEP_SUMMARY"

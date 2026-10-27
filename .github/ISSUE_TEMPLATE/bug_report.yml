@@ -17,4 +17,4 @@ body:
     id: version
     attributes:
       label: QualityLens version and Gitea version
-      placeholder: "qualitylens 1.1.0, Gitea 1.22.6"
+      placeholder: "qualitylens 2.0.0, Gitea 1.22.6"

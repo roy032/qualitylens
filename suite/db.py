@@ -8,7 +8,7 @@ from __future__ import annotations
 import psycopg
 from psycopg.rows import dict_row
 
-from qualitylens.config import settings
+from suite.config import settings
 
 
 class Database:

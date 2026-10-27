@@ -15,7 +15,7 @@ import pytest
 
 from pages.login_page import LoginPage
 from qualitylens import visual
-from qualitylens.config import settings
+from suite.config import settings
 
 pytestmark = [pytest.mark.visual, pytest.mark.ui, allure.feature("Visual regression")]
 OWNER = settings.admin_user

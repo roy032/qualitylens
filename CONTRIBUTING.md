@@ -61,10 +61,11 @@ QualityLens never retries. Instead:
 | Gate | Where | Fails when |
 |---|---|---|
 | Ruff | lint job, pre-commit | lint or import-order error |
-| Mypy | lint job, pre-commit | type error in `qualitylens/`, `scripts/`, `ai/` |
+| Mypy | lint job, pre-commit | type error in `qualitylens/`, `suite/`, `scripts/`, `ai/` |
 | pip-audit | lint job | a pinned dependency has a known vulnerability |
 | Quarantine check | lint job, pre-commit | expired, ownerless or dangling quarantine entry |
 | Package build | lint job | the wheel does not build or its CLI does not start |
+| Toolkit self-test | toolkit job | `qualitylens init` output fails on a healthy sample app, misses a seeded defect, or does not stop when the app is down |
 | Coverage | unit job | framework branch coverage under 90 % |
 | Mutation | mutation job | mutation score under 90 % |
 | E2E | e2e, cross-browser, visual jobs | unexpected failure, or a known bug starts passing |
@@ -78,6 +79,6 @@ suite would notice. Dependabot opens weekly update PRs; they go through the same
 ## Releases
 
 Bump `__version__` in `qualitylens/__init__.py`, move the `CHANGELOG.md` section from "unreleased" to
-the date, merge, then run **Actions > Release > Run workflow** with the version (for example `v1.1.0`).
+the date, merge, then run **Actions > Release > Run workflow** with the version (for example `v2.0.0`).
 The workflow runs the unit suite, builds the package and an SBOM, creates the tag and publishes the
 GitHub release with the changelog section as notes.

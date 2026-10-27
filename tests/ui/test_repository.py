@@ -5,8 +5,8 @@ from playwright.sync_api import expect
 
 from pages.new_repo_page import NewRepoPage
 from pages.repo_page import RepoPage
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.ui, allure.feature("Repositories")]
 OWNER = settings.admin_user

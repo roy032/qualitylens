@@ -1,52 +1,16 @@
-"""Thin wrapper around requests.Session for the Gitea REST API (/api/v1).
-
-Methods return the raw Response so tests can assert on status codes and bodies,
-including negative cases. Helpers that *set up* data use `_ok()` to fail fast if
-setup itself breaks, which keeps test failures pointing at the real problem.
-"""
+"""Gitea REST API (/api/v1) on top of the engine's ApiClient: one method per endpoint the suite uses."""
 from __future__ import annotations
 
-from typing import Any
-
-import requests
-
-from qualitylens.config import settings
+from qualitylens.http import ApiClient
+from suite.config import settings
 
 
-class GiteaApi:
+class GiteaApi(ApiClient):
     def __init__(self, auth: tuple[str, str] | None = None, token: str | None = None,
                  base_url: str = settings.api_url, timeout: float = 15):
-        self.base_url = base_url
-        self.timeout = timeout
-        self.session = requests.Session()
-        if auth:
-            self.session.auth = auth
-        if token:
-            self.session.headers["Authorization"] = f"token {token}"
+        super().__init__(base_url, auth=auth, token=token, token_scheme="token", timeout=timeout)
 
-    # --- generic verbs ---------------------------------------------------
-    def request(self, method: str, path: str, **kwargs) -> requests.Response:
-        kwargs.setdefault("timeout", self.timeout)
-        return self.session.request(method, f"{self.base_url}{path}", **kwargs)
-
-    def get(self, path, **kw):
-        return self.request("GET", path, **kw)
-
-    def post(self, path, **kw):
-        return self.request("POST", path, **kw)
-
-    def patch(self, path, **kw):
-        return self.request("PATCH", path, **kw)
-
-    def delete(self, path, **kw):
-        return self.request("DELETE", path, **kw)
-
-    @staticmethod
-    def _ok(resp: requests.Response, *expected: int) -> Any:  # decoded JSON: an object or a list
-        expected = expected or (200, 201)
-        assert resp.status_code in expected, (
-            f"Setup call {resp.request.method} {resp.url} returned {resp.status_code}: {resp.text[:300]}")
-        return resp.json() if resp.content else {}
+    _ok = staticmethod(ApiClient.ok)  # the name the suite's fixtures use
 
     # --- users -------------------------------------------------------------
     def me(self):

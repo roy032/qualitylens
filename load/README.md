@@ -38,7 +38,7 @@ Results land in `load/results/` (CSV per endpoint and an HTML report); CI upload
 
 ## Trend
 
-The fixed SLO only catches a large slowdown. After every CI run, `scripts/load_trend.py` compares each
+The fixed SLO only catches a large slowdown. After every CI run, `qualitylens load-trend` compares each
 endpoint's p95 with the median of the previous runs (kept in the Actions cache, up to 30) and writes the
 table and a sparkline of the overall p95 to the job summary. The job fails when the overall p95 is more
 than 50 % above that median; with fewer than three earlier runs it only reports. `make load` does the same

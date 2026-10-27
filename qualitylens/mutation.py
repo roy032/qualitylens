@@ -1,7 +1,7 @@
 """Mutation score from mutmut's stats file, as Markdown; exit code 1 when it is below the minimum.
 
     mutmut run && mutmut export-cicd-stats
-    python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90 >> "$GITHUB_STEP_SUMMARY"
+    qualitylens mutation-score mutants/mutmut-cicd-stats.json --min 90 >> "$GITHUB_STEP_SUMMARY"
 
 Score = killed / (killed + survived + no tests + timeout). A mutant that times out is counted as
 not killed, so a slow test suite cannot inflate the score.

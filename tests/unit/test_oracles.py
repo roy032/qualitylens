@@ -1,7 +1,7 @@
 """The expected-behaviour models the property-based API tests compare Gitea against."""
 import pytest
 
-from qualitylens import oracles
+from suite import oracles
 
 pytestmark = pytest.mark.unit
 

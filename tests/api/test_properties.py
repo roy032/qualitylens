@@ -17,10 +17,10 @@ from hypothesis import settings as hsettings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, rule, run_state_machine_as_test
 
-from qualitylens import oracles
-from qualitylens.api_client import GiteaApi
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite import oracles
+from suite.api_client import GiteaApi
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.api, pytest.mark.property, allure.feature("API: Property-based")]
 OWNER = settings.admin_user

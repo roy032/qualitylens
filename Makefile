@@ -64,18 +64,20 @@ cross-browser:      ## UI suite on Firefox and WebKit (needs: python -m playwrig
 	pytest -m "ui and not visual" --browser firefox --browser webkit -n auto
 
 coverage:           ## unit tests with branch coverage of the framework (fails under 90 %, see .coveragerc)
-	pytest tests/unit -m unit --cov --cov-report=term-missing --cov-report=html
+	# coverage run (not --cov) so it also measures the plugin modules pytest imports at start-up via the
+	# package's entry point, after `pip install -e .`
+	coverage run -m pytest tests/unit -m unit && coverage report && coverage html
 
 mutation:           ## mutate the framework's logic and check the unit tests notice (fails under 90 %)
 	pip install -q mutmut==3.8.0
 	rm -rf mutants; mutmut run --max-children 4; mutmut export-cicd-stats
-	python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90
+	python -m qualitylens mutation-score mutants/mutmut-cicd-stats.json --min 90
 
 load:               ## 60 s load test with pass/fail thresholds
 	mkdir -p load/results
 	locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
 	       --csv load/results/run --html load/results/report.html --only-summary
-	python scripts/load_trend.py load/results/run_stats.csv --history load/history/history.json
+	python -m qualitylens load-trend load/results/run_stats.csv --history load/history/history.json
 
 evidence:           ## re-run every bug reproduction and refresh bug-reports/evidence
 	python scripts/capture_evidence.py
@@ -85,7 +87,7 @@ report:             ## open the Allure report (needs Java)
 
 flake-hunt:         ## run the suite 3 times and list tests whose result changed
 	rm -rf runs; for i in 1 2 3; do pytest -m "not unit and not serial" -n auto -q --junitxml=runs/run-$$i.xml; done; \
-	python scripts/ci_summary.py --runs runs/run-*.xml
+	python -m qualitylens summary --runs runs/run-*.xml
 
 ai-eval:            ## generate (needs ANTHROPIC_API_KEY) and evaluate AI test cases
 	python -m ai.generate ai/stories/create_issue.md

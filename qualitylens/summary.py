@@ -1,7 +1,7 @@
 """Turn pytest JUnit XML into a Markdown run summary (GitHub job summary, PR comment, or terminal).
 
-    python scripts/ci_summary.py results/*.xml >> "$GITHUB_STEP_SUMMARY"
-    python scripts/ci_summary.py --runs runs/run-*.xml
+    qualitylens summary results/*.xml >> "$GITHUB_STEP_SUMMARY"
+    qualitylens summary --runs runs/run-*.xml
 
 Default: the files are parts of one run (smoke, regression, ...) and are merged into results per
 layer (ui, api, db, security, a11y, unit), failures, pinned known bugs and the slowest tests.
@@ -15,11 +15,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-try:
-    from qualitylens.junit import OUTCOMES, Result, parse
-except ImportError:  # run as a script from another directory: python scripts/ci_summary.py
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from qualitylens.junit import OUTCOMES, Result, parse
+from qualitylens.junit import OUTCOMES, Result, parse
 
 __all__ = ["OUTCOMES", "Result", "flaky", "layer_table", "main", "parse", "summarize"]
 

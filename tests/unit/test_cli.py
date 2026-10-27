@@ -1,13 +1,15 @@
 """The qualitylens command line: profiles, history, flaky report, quarantine check, impact and dashboard."""
-import json
 import sys
 from pathlib import Path
 
 import pytest
 
 from qualitylens import cli, history
+from qualitylens import project as project_config
 
 pytestmark = pytest.mark.unit
+ROOT = Path(__file__).parents[2]
+GITEA = project_config.load(ROOT / "qualitylens.toml", env={})
 
 JUNIT = ('<?xml version="1.0"?><testsuites><testsuite name="pytest">'
          '<testcase classname="tests.api.test_x" name="test_ok" time="1.5"/>{extra}'
@@ -45,29 +47,43 @@ def test_a_command_is_required(capsys):
     ("property", [["-m", "property and not quarantined"]]),
 ])
 def test_profiles(profile, expected):
-    commands = cli.pytest_commands(profile, ["-q"], None)
+    commands = cli.pytest_commands(GITEA, profile, ["-q"], None)
     assert commands == [[sys.executable, "-m", "pytest", *step, "-q"] for step in expected]
 
 
 def test_profiles_write_one_junit_file_per_step(tmp_path):
-    commands = cli.pytest_commands("fast", [], tmp_path)
+    commands = cli.pytest_commands(GITEA, "fast", [], tmp_path)
     assert [c[-1] for c in commands] == [f"--junitxml={tmp_path / 'fast-1.xml'}", f"--junitxml={tmp_path / 'fast-2.xml'}"]
 
 
 def test_impacted_profile_runs_only_the_affected_layers():
-    commands = cli.pytest_commands("impacted", [], None, changed=lambda: ["pages/login_page.py", "tests/db/x.py"])
+    commands = cli.pytest_commands(GITEA, "impacted", [], None,
+                                   changed=lambda: ["pages/login_page.py", "tests/db/x.py"])
     assert commands == [[sys.executable, "-m", "pytest", "-m",
                          "(a11y or db or security or ui or visual) and not quarantined and not serial"]]
 
 
 def test_impacted_profile_falls_back_to_fast_for_shared_code():
-    assert cli.pytest_commands("impacted", [], None, changed=lambda: ["tests/conftest.py"]) == \
-        cli.pytest_commands("fast", [], None)
+    assert cli.pytest_commands(GITEA, "impacted", [], None, changed=lambda: ["tests/conftest.py"]) == \
+        cli.pytest_commands(GITEA, "fast", [], None)
 
 
 def test_impacted_profile_with_docs_only_runs_nothing():
-    assert cli.pytest_commands("impacted", [], None, changed=lambda: ["README.md"]) == []
-    assert cli.pytest_commands("impacted", [], None) == []
+    assert cli.pytest_commands(GITEA, "impacted", [], None, changed=lambda: ["README.md"]) == []
+    assert cli.pytest_commands(GITEA, "impacted", [], None) == []
+
+
+def test_unknown_profile_lists_the_choices():
+    with pytest.raises(SystemExit, match="unknown profile 'nope'; choose from: a11y, api, db, fast, full, impacted"):
+        cli.pytest_commands(GITEA, "nope", [], None)
+
+
+def test_default_project_profiles_and_layers(tmp_path):
+    plain = project_config.load(start=tmp_path, env={})
+    assert cli.steps_for(plain, "smoke") == [["-m", "smoke and not quarantined"]]
+    assert cli.steps_for(plain, "full") == [["-m", "not quarantined"]]
+    with pytest.raises(SystemExit):
+        cli.steps_for(plain, "ui")  # not a declared layer
 
 
 def test_run_passes_extra_args_and_returns_the_worst_exit_code(capsys, monkeypatch):
@@ -75,7 +91,7 @@ def test_run_passes_extra_args_and_returns_the_worst_exit_code(capsys, monkeypat
     codes = iter([1, 0])
     monkeypatch.setattr(cli, "_subprocess_runner", lambda cmd: seen.append(cmd) or next(codes))
     args = cli.build_parser().parse_args(["run", "fast"])
-    args.pytest_args = ["-x"]
+    args.project, args.pytest_args = GITEA, ["-x"]
     assert cli.cmd_run(args, runner=cli._subprocess_runner) == 1
     assert [c[-1] for c in seen] == ["-x", "-x"]
     assert capsys.readouterr().out.startswith("$ ")
@@ -83,6 +99,7 @@ def test_run_passes_extra_args_and_returns_the_worst_exit_code(capsys, monkeypat
 
 def test_no_tests_collected_is_not_a_failure():
     args = cli.build_parser().parse_args(["run", "quarantined"])
+    args.project = GITEA
     assert cli.cmd_run(args, runner=lambda cmd: cli.NO_TESTS_COLLECTED) == 0
     assert cli.NO_TESTS_COLLECTED == 5
 
@@ -218,7 +235,7 @@ def test_dashboard(tmp_path, capsys):
 def test_doctor(monkeypatch, capsys):
     from qualitylens import doctor
 
-    monkeypatch.setattr(doctor, "run_all", lambda settings, offline: [doctor.Check("Python", offline, "x")])
+    monkeypatch.setattr(doctor, "run_all", lambda project, offline: [doctor.Check("Python", offline, "x")])
     assert cli.main(["doctor", "--offline"]) == 0
     assert "Ready to run the suite." in capsys.readouterr().out
     assert cli.main(["doctor"]) == 1
@@ -233,6 +250,47 @@ def test_module_entry_point():
     assert out == "none\n"
 
 
-def test_default_history_path():
-    assert Path("test-history/history.json") == cli.DEFAULT_HISTORY
-    assert json.loads("[]") == []
+def test_defaults_come_from_the_project(tmp_path, monkeypatch, capsys):
+    (tmp_path / "qualitylens.toml").write_text('[project]\nname = "Shop"\n[history]\npath = "h/runs.json"\nkeep = 1\n')
+    monkeypatch.chdir(tmp_path)
+    junit(tmp_path / "a.xml")
+    assert cli.main(["history", "add", "a.xml", "--label", "one"]) == 0
+    assert cli.main(["history", "add", "a.xml", "--label", "two"]) == 0
+    assert [r["label"] for r in history.load(tmp_path / "h/runs.json")] == ["two"]
+    assert cli.main(["dashboard"]) == 0
+    assert "<title>Shop test trends</title>" in (tmp_path / "h/trends.html").read_text()
+    assert cli.main(["quarantine", "check"]) == 0
+    assert cli.main(["flaky"]) == 0
+    assert "collecting history (1 of 10 runs)" in capsys.readouterr().out
+
+
+def test_config_option_and_errors(tmp_path, capsys):
+    bad = tmp_path / "bad.toml"
+    bad.write_text("[project\n")
+    assert cli.main(["--config", str(bad), "impact", "README.md"]) == 2
+    assert capsys.readouterr().err.startswith(f"✗ {bad}: ")
+
+
+@pytest.mark.parametrize("command, module", [("summary", "qualitylens.summary"), ("load-trend", "qualitylens.load_trend"),
+                                             ("compat", "qualitylens.compat"), ("mutation-score", "qualitylens.mutation")])
+def test_report_commands_pass_their_arguments_through(monkeypatch, command, module):
+    import importlib
+
+    seen = []
+    monkeypatch.setattr(importlib.import_module(module), "main", lambda argv: seen.append(argv) or 7)
+    assert cli.main([command, "--runs", "a.xml"]) == 7
+    assert seen == [["--runs", "a.xml"]]
+
+
+def test_init(tmp_path, capsys):
+    target = tmp_path / "shop-qa"
+    assert cli.main(["init", str(target), "--url", "http://localhost:8000/", "--health", "/health",
+                     "--api-prefix", "/api"]) == 0
+    out = capsys.readouterr().out
+    assert f"  created {target / 'qualitylens.toml'}" in out
+    assert "Next: cd" in out
+    shop = project_config.load(target / "qualitylens.toml", env={})
+    assert (shop.name, shop.base_url, shop.health_url, shop.api_url) == (
+        "shop-qa", "http://localhost:8000", "http://localhost:8000/health", "http://localhost:8000/api")
+    assert cli.main(["init", str(target), "--url", "http://x"]) == 0
+    assert f"  kept    {target / 'qualitylens.toml'} (exists; --force overwrites)" in capsys.readouterr().out

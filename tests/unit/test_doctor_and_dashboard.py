@@ -4,11 +4,13 @@ import re
 import pytest
 
 from qualitylens import dashboard, doctor
-from qualitylens.config import Settings
+from qualitylens.project import Login, Project
 
 pytestmark = pytest.mark.unit
-SETTINGS = Settings(base_url="http://app:3000", admin_user="qa", admin_password="pw",
-                    db_dsn="postgresql://u:p@db:5432/gitea")
+PROJECT = Project(name="Shop", base_url="http://app:3000", health_path="/health", start_hint="make up",
+                  login=Login("/api/me", "qa", "pw"), database_dsn="postgresql://u:p@db:5432/shop",
+                  packages=("pytest", "locust"), browser=True)
+BARE = Project(name="Plain")
 
 
 class FakeResponse:
@@ -34,8 +36,9 @@ def test_python_version():
 
 
 def test_packages():
-    assert doctor.check_packages(lambda name: object()).ok
-    check = doctor.check_packages(lambda name: None if name in ("locust", "pytest") else object())
+    assert doctor.check_packages(("pytest",), lambda name: object()).ok
+    check = doctor.check_packages(("pytest", "requests", "locust"),
+                                  lambda name: None if name in ("locust", "pytest") else object())
     assert check == doctor.Check("Python packages", False,
                                  "missing pytest, locust: pip install -r requirements.txt")
 
@@ -63,14 +66,14 @@ def test_app():
 
     def get(url, **kw):
         calls.append((url, kw))
-        return FakeResponse(body={"version": "1.22.6"})
+        return FakeResponse(204)
 
-    assert doctor.check_app(SETTINGS, get) == doctor.Check("Gitea", True, "1.22.6 at http://app:3000")
-    assert calls == [("http://app:3000/api/v1/version", {"timeout": 5})]
-    assert doctor.check_app(SETTINGS, lambda url, **kw: FakeResponse(body={})).detail == "? at http://app:3000"
-    down = doctor.check_app(SETTINGS, boom)
-    assert down == doctor.Check("Gitea", False, "not reachable at http://app:3000 (ConnectionError): make up")
-    assert not doctor.check_app(SETTINGS, lambda url, **kw: FakeResponse(500)).ok
+    assert doctor.check_app(PROJECT, get) == doctor.Check("Shop (app)", True, "http://app:3000/health answers 204")
+    assert calls == [("http://app:3000/health", {"timeout": 5})]
+    down = doctor.check_app(PROJECT, boom)
+    assert down == doctor.Check("Shop (app)", False,
+                                "not reachable at http://app:3000/health (ConnectionError): make up")
+    assert not doctor.check_app(PROJECT, lambda url, **kw: FakeResponse(500)).ok
 
 
 def test_login():
@@ -80,12 +83,17 @@ def test_login():
         calls.append((url, kw))
         return FakeResponse(200)
 
-    assert doctor.check_login(SETTINGS, get) == doctor.Check("Admin login", True, "qa")
-    assert calls == [("http://app:3000/api/v1/user", {"auth": ("qa", "pw"), "timeout": 5})]
-    assert doctor.check_login(SETTINGS, lambda url, **kw: FakeResponse(401)) == doctor.Check(
-        "Admin login", False, "HTTP 401 for qa: run make up to create the admin")
-    assert doctor.check_login(SETTINGS, boom) == doctor.Check("Admin login", False,
-                                                              "ConnectionError: is Gitea running?")
+    assert doctor.check_login(PROJECT, get) == doctor.Check("Login", True, "qa")
+    assert calls == [("http://app:3000/api/me", {"auth": ("qa", "pw"), "timeout": 5})]
+    assert doctor.check_login(PROJECT, lambda url, **kw: FakeResponse(401)) == doctor.Check(
+        "Login", False, "HTTP 401 for qa: wrong credentials, or the user does not exist")
+    assert doctor.check_login(PROJECT, boom) == doctor.Check("Login", False, "ConnectionError: is the app running?")
+
+
+def test_login_without_user():
+    nobody = Project(login=Login("/api/me", "", ""))
+    check = doctor.check_login(nobody, boom)
+    assert not check.ok and "user_env" in check.detail
 
 
 def test_db():
@@ -101,10 +109,10 @@ def test_db():
         calls.append((dsn, kw))
         return Conn()
 
-    assert doctor.check_db(SETTINGS, connect) == doctor.Check("PostgreSQL", True, "db:5432/gitea", False)
-    assert calls == [("postgresql://u:p@db:5432/gitea", {"connect_timeout": 5})] and closed == [True]
-    down = doctor.check_db(SETTINGS, boom)
-    assert down == doctor.Check("PostgreSQL", False, "ConnectionError: is the db container up? (make up)", False)
+    assert doctor.check_db(PROJECT, connect) == doctor.Check("Database", True, "db:5432/shop", False)
+    assert calls == [("postgresql://u:p@db:5432/shop", {"connect_timeout": 5})] and closed == [True]
+    down = doctor.check_db(PROJECT, boom)
+    assert down == doctor.Check("Database", False, "ConnectionError: is the database up?", False)
 
 
 def test_render_and_health():
@@ -116,16 +124,23 @@ def test_render_and_health():
 
 
 def test_run_all_offline_skips_network_checks():
-    names = [c.name for c in doctor.run_all(SETTINGS, offline=True)]
+    names = [c.name for c in doctor.run_all(PROJECT, offline=True)]
     assert names == ["Python", "Python packages", "Docker", "Chromium (Playwright)"]
+
+
+def test_run_all_checks_only_what_is_configured(monkeypatch):
+    import requests
+
+    monkeypatch.setattr(requests, "get", boom)
+    assert [c.name for c in doctor.run_all(BARE)] == ["Python", "Python packages", "Docker"]
 
 
 def test_run_all_online_adds_app_checks(monkeypatch):
     import requests
 
     monkeypatch.setattr(requests, "get", boom)
-    names = [c.name for c in doctor.run_all(SETTINGS)]
-    assert names[-3:] == ["Gitea", "Admin login", "PostgreSQL"]
+    names = [c.name for c in doctor.run_all(PROJECT)]
+    assert names[-3:] == ["Shop (app)", "Login", "Database"]
 
 
 # --- dashboard ------------------------------------------------------------

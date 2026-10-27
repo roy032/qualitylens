@@ -1,7 +1,8 @@
 """Offline checks of the accessibility baseline logic and the JSON-schema contract helper."""
 import pytest
 
-from qualitylens import a11y, schemas
+from qualitylens import a11y
+from suite import schemas
 
 pytestmark = pytest.mark.unit
 

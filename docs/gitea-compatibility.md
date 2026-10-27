@@ -2,7 +2,7 @@
 
 What would happen to this suite, and to users, if the project upgraded Gitea. Produced on 21 Oct 2026 by
 running the whole suite (186 UI, API, DB, security and accessibility tests) against clean installs of both
-versions and comparing the JUnit results with `scripts/compat_report.py`. The weekly
+versions and comparing the JUnit results with `qualitylens compat`. The weekly
 `gitea-compat.yml` workflow repeats this in CI and writes the same report to its run summary.
 
 ## Verdict
