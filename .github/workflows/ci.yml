@@ -62,7 +62,7 @@ jobs:
           if [ -f results/coverage.md ]; then
             { echo "### Framework coverage"; echo; cat results/coverage.md; } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: coverage
@@ -97,7 +97,7 @@ jobs:
       # Same image locally and in CI, so fonts and rendering are identical and baselines are portable.
       - name: Compare 8 screens with tests/visual/baseline/<gitea version>/
         run: make visual
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: failure()
         with:
           name: visual-diffs
@@ -219,25 +219,25 @@ jobs:
           path: allure-history
           key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: allure-report
           path: allure-report
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: junit-results
           path: results
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: test-trends
           path: test-history
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: failure()
         with:
           name: playwright-failures
@@ -283,7 +283,7 @@ jobs:
         if: always()
         run: |
           { echo "# ${{ matrix.browser }}"; python -m qualitylens summary results/*.xml; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: failure()
         with:
           name: playwright-failures-${{ matrix.browser }}
@@ -378,7 +378,7 @@ jobs:
         with:
           path: load/history
           key: load-history-${{ github.ref_name }}-${{ github.run_id }}
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: load-report
@@ -402,7 +402,7 @@ jobs:
         run: python -m ai.generate ai/stories/create_issue.md
       - name: Compare with the manual suite
         run: python -m ai.evaluate ai/output/create_issue.ai.json --feature Issues
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ai-evaluation
           path: ai/output
