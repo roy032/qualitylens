@@ -54,7 +54,7 @@ jobs:
         if: success() || failure()
         continue-on-error: ${{ matrix.gitea != '1.22.6' }}
         run: pytest -m serial --junitxml=results/integrity.xml
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: junit-gitea-${{ matrix.gitea }}
@@ -75,7 +75,7 @@ jobs:
         run: |
           args=$(ls -d junit/junit-gitea-* | sort -V | sed -E 's|^junit/junit-gitea-(.*)$|\1=&|')
           python -m qualitylens compat $args | tee compat.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: compatibility-report
           path: compat.md
