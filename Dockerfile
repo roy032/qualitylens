@@ -7,7 +7,7 @@
 #   docker run --rm -e QL_BASE_URL=https://gitea.example.com -e QL_ADMIN_PASSWORD=... qualitylens run smoke
 #
 # Same base image as the visual suite (Makefile), so screenshots match the approved baselines.
-FROM mcr.microsoft.com/playwright/python:v1.56.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.64.1-noble
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
