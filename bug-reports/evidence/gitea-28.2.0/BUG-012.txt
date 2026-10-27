@@ -1,0 +1,25 @@
+BUG-012 evidence. Gitea 28.2.0, http://localhost:3000
+
+# Create: the title is trimmed
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-3cce6bb8/issues
+> {"title": "  padded  "}
+< 201
+< {"number": 8, "title": "padded"}
+
+# Edit to the same text: stored untrimmed
+> PATCH http://localhost:3000/api/v1/repos/qa_admin/evidence-3cce6bb8/issues/8
+> {"title": "  padded  "}
+< 201
+< {"number": 8, "title": "  padded  "}
+
+# Edit to three spaces: accepted
+> PATCH http://localhost:3000/api/v1/repos/qa_admin/evidence-3cce6bb8/issues/8
+> {"title": "   "}
+< 201
+< {"number": 8, "title": "   "}
+
+# For comparison: create rejects an empty title
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-3cce6bb8/issues
+> {"title": ""}
+< 422
+< {"message": "[Title]: Required", "url": "http://localhost:3000/api/swagger"}

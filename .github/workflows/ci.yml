@@ -180,6 +180,43 @@ jobs:
         with:
           path: allure-report
 
+  cross-browser:
+    name: UI on ${{ matrix.browser }}
+    needs: unit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - name: Start Gitea + PostgreSQL (warms up while dependencies install)
+        run: docker compose up -d --quiet-pull
+      - run: pip install -r requirements.txt
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: bash scripts/bootstrap.sh
+      # Visual baselines are Chromium screenshots, so the visual suite stays on Chromium (job "visual").
+      - name: UI suite on ${{ matrix.browser }}
+        run: >
+          pytest -m "ui and not visual" --browser ${{ matrix.browser }} -n auto
+          --junitxml=results/ui-${{ matrix.browser }}.xml --screenshot=only-on-failure --output=test-results
+      - name: Run summary
+        if: always()
+        run: |
+          { echo "# ${{ matrix.browser }}"; python scripts/ci_summary.py results/*.xml; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-failures-${{ matrix.browser }}
+          path: test-results
+
   publish-report:
     name: Publish Allure report to GitHub Pages
     needs: e2e
@@ -215,11 +252,35 @@ jobs:
           mkdir -p load/results
           locust -f load/locustfile.py --headless -u 20 -r 5 -t 60s --host http://localhost:3000 \
                  --csv load/results/run --html load/results/report.html --only-summary
+      # Each run is compared with the median of earlier runs, so a gradual slowdown shows up before the SLO breaks.
+      - name: Restore load history
+        if: always()
+        uses: actions/cache/restore@v4
+        with:
+          path: load/history
+          key: load-history-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            load-history-${{ github.ref_name }}-
+            load-history-main-
+      - name: Load trend (fails if p95 is over 50 % above the median of recent runs)
+        if: always() && hashFiles('load/results/run_stats.csv') != ''
+        shell: bash
+        run: >
+          python scripts/load_trend.py load/results/run_stats.csv --history load/history/history.json
+          --label "${GITHUB_SHA::7} (run ${{ github.run_number }})" --max-regression 50 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Save load history
+        if: always() && hashFiles('load/history/history.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: load/history
+          key: load-history-${{ github.ref_name }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: load-report
-          path: load/results
+          path: |
+            load/results
+            load/history
 
   ai-eval:
     name: AI test-case generation + evaluation

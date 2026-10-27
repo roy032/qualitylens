@@ -11,3 +11,4 @@ pillow==13.0.0
 allure-pytest==2.16.2
 locust==2.46.7
 anthropic==1.13.0
+hypothesis==6.170.5

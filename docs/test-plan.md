@@ -36,6 +36,9 @@ passwords, 40-char usernames, 100-char repo names, 255-char titles), negative te
 rule, error guessing (whitespace, Unicode, HTML, SQL metacharacters), and security basics (authentication,
 authorisation, least-privilege tokens, not revealing private data). Authorisation tests use two accounts and
 read the data back as the owner, so a request that is refused but still changes something is caught.
+Property-based and model-based testing (Hypothesis) complement these: instead of chosen examples, generated
+inputs are checked against rules (round trips, never 5xx, an oracle of the documented validation rules), and
+random sequences of issue operations are compared with an in-memory model after every step.
 
 ## 4. Environment setup
 `docker-compose.yml` pins image versions. Data is created per test through the API with unique names and

@@ -1,0 +1,43 @@
+BUG-011 evidence. Gitea 1.22.6, http://localhost:3000
+
+# Create issue whose title contains U+0000
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/issues
+> {"title": "before\u0000after"}
+< 500
+< {"message": "newIssue: pq: invalid byte sequence for encoding \"UTF8\": 0x00", "url": "http://localhost:3000/api/swagger"}
+
+# Same character in the issue body
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/issues
+> {"title": "t", "body": "before\u0000after"}
+< 500
+< {"message": "newIssue: pq: invalid byte sequence for encoding \"UTF8\": 0x00", "url": "http://localhost:3000/api/swagger"}
+
+# In a comment
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/issues/6/comments
+> {"body": "before\u0000after"}
+< 500
+< {"message": "pq: invalid byte sequence for encoding \"UTF8\": 0x00", "url": "http://localhost:3000/api/swagger"}
+
+# In a milestone title
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/milestones
+> {"title": "before\u0000after"}
+< 500
+< {"message": "pq: invalid byte sequence for encoding \"UTF8\": 0x00", "url": "http://localhost:3000/api/swagger"}
+
+# In a label name
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/labels
+> {"name": "before\u0000after", "color": "#ee0701"}
+< 500
+< {"message": "pq: invalid byte sequence for encoding \"UTF8\": 0x00", "url": "http://localhost:3000/api/swagger"}
+
+# As a repository search keyword
+> GET http://localhost:3000/api/v1/repos/search?q=before%00after
+
+< 500
+< {"ok": false, "error": "Count: pq: invalid byte sequence for encoding \"UTF8\": 0x00"}
+
+# For comparison: U+0001 is accepted
+> POST http://localhost:3000/api/v1/repos/qa_admin/evidence-65bbe71c/issues
+> {"title": "before\u0001after"}
+< 201
+< {"number": 7, "title": "before\u0001after"}

@@ -1,0 +1,27 @@
+name: Deep fuzz
+
+# The property-based API tests run on every push with a fixed seed and 40 examples each, so a red build
+# is always reproducible. Once a week they run with random seeds and ten times the examples to search
+# further. A failure prints the shrunk input and a @reproduce_failure line to replay it locally.
+on:
+  schedule:
+    - cron: "0 4 * * 1"   # Mondays 04:00 UTC, after the flake hunt
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+      - run: bash scripts/bootstrap.sh
+      - name: Property-based tests, profile "deep"
+        env:
+          HYPOTHESIS_PROFILE: deep
+        run: pytest -m property -n auto --junitxml=results/fuzz.xml
+      - name: Run summary
+        if: always()
+        run: python scripts/ci_summary.py results/fuzz.xml >> "$GITHUB_STEP_SUMMARY"
