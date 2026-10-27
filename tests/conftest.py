@@ -9,16 +9,17 @@ import os
 
 import allure
 import pytest
-import requests
 from hypothesis import settings as hypothesis_settings
 
 from pages.login_page import LoginPage
-from qualitylens.api_client import GiteaApi
-from qualitylens.config import settings
-from qualitylens.data import new_user_payload, unique
-from qualitylens.db import Database
+from suite.api_client import GiteaApi
+from suite.config import settings
+from suite.data import new_user_payload, unique
+from suite.db import Database
 
-pytest_plugins = ["qualitylens.pytest_plugin"]  # flaky-test quarantine (quarantine.toml)
+# The QualityLens engine plugin (quarantine, app reachability check from qualitylens.toml). Installing the
+# package loads it too, under the same name, so this line also works from a plain checkout.
+pytest_plugins = ["qualitylens.pytest_plugin", "pytester"]  # pytester: tests of the plugin itself
 
 # Property-based tests (tests/api/test_properties.py). "ci": same examples on every run, so a red build
 # is reproducible and never a coin toss; "deep": random seeds and ten times the examples (make fuzz).
@@ -30,18 +31,6 @@ hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "ci"))
 def pytest_addoption(parser):
     parser.addoption("--update-snapshots", action="store_true",
                      help="visual tests: save the current screenshots as the new baselines")
-
-
-@pytest.hookimpl(trylast=True)  # after -m has deselected, so `pytest -m unit` works without the app
-def pytest_collection_modifyitems(session, config, items):
-    """Fail fast with a clear message if the app is not running (skipped for offline unit tests)."""
-    if not any(item.get_closest_marker(m) for item in items for m in ("ui", "api", "db", "security", "a11y")):
-        return
-    try:
-        requests.get(f"{settings.api_url}/version", timeout=5).raise_for_status()
-    except requests.RequestException as exc:
-        pytest.exit(f"Gitea is not reachable at {settings.base_url} ({exc}). "
-                    f"Start it with: bash scripts/bootstrap.sh", returncode=3)
 
 
 # --- API / DB ------------------------------------------------------------

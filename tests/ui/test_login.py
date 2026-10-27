@@ -5,7 +5,7 @@ from playwright.sync_api import expect
 
 from pages.dashboard_page import DashboardPage
 from pages.login_page import LoginPage
-from qualitylens.config import settings
+from suite.config import settings
 
 pytestmark = [pytest.mark.ui, allure.feature("Authentication")]
 

@@ -7,9 +7,9 @@ reading the data back as the owner, so a 403 that still changed something is cau
 import allure
 import pytest
 
-from qualitylens.api_client import GiteaApi
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.api_client import GiteaApi
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.security, pytest.mark.api, allure.feature("Security: Access control")]
 OWNER = settings.admin_user

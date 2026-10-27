@@ -6,7 +6,7 @@ means editing one class instead of every test.
 """
 from playwright.sync_api import Locator, Page, expect
 
-from qualitylens.config import settings
+from suite.config import settings
 
 
 class BasePage:

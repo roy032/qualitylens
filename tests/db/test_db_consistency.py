@@ -13,8 +13,8 @@ from playwright.sync_api import expect
 
 from pages.issue_pages import IssuePage, NewIssuePage
 from pages.new_repo_page import NewRepoPage
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.db, allure.feature("Database")]
 OWNER = settings.admin_user

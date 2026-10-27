@@ -1,0 +1,113 @@
+# QualityLens project file for this repository's own suite: Gitea 1.22.6 + PostgreSQL (docker-compose.yml).
+# A suite for another app gets its own file from `qualitylens init`; see docs/toolkit.md.
+
+[project]
+name = "Gitea"
+# pytest markers; tests/<layer>/ belongs to its marker for impact selection
+layers = ["unit", "smoke", "ui", "api", "db", "security", "a11y", "visual", "property"]
+
+[target]
+base_url = "http://localhost:3000"          # QL_BASE_URL overrides it
+health_path = "/api/v1/version"
+requires_app = ["ui", "api", "db", "security", "a11y"]
+start_hint = "bash scripts/bootstrap.sh (or: make up)"
+api_prefix = "/api/v1"
+
+[target.login]
+path = "/api/v1/user"
+user_env = "QL_ADMIN_USER"
+password_env = "QL_ADMIN_PASSWORD"
+default_user = "qa_admin"                   # throwaway local Gitea only, see SECURITY.md
+default_password = "QaAdmin#2026"
+
+[target.database]
+dsn_env = "QL_DB_DSN"
+default_dsn = "postgresql://gitea:gitea@localhost:5432/gitea"
+
+[doctor]
+packages = ["pytest", "playwright", "requests", "psycopg", "jsonschema", "hypothesis", "allure_commons", "locust"]
+browser = true
+
+# One pytest call per list, in order. Mirrors the Makefile and CI.
+[profiles]
+smoke = [["-m", "smoke", "-n", "auto"]]
+fast = [["-m", "(ui or api or db or security or a11y) and not serial and not visual and not quarantined", "-n", "auto"],
+        ["-m", "serial and not quarantined"]]
+full = [["-m", "not serial and not visual and not quarantined"], ["-m", "serial and not quarantined"]]
+
+[history]
+path = "test-history/history.json"
+keep = 50
+
+[flaky]
+min_runs = 10
+threshold = 0.1
+
+[quarantine]
+path = "quarantine.toml"
+
+[impact]
+fallback_profile = "fast"   # `qualitylens run impacted` when a change can affect everything
+
+# First match wins; then tests/<layer>/ -> <layer>; anything else selects the whole suite.
+[[impact.rule]]                   # the toolkit self-test's site; CI job "toolkit" covers it
+glob = "examples/*"
+layers = []
+
+[[impact.rule]]
+glob = "bug-reports/*"
+layers = []
+[[impact.rule]]
+glob = "test-cases/*"
+layers = ["unit"]
+[[impact.rule]]
+glob = "tests/api/test_properties.py"
+layers = ["property"]
+[[impact.rule]]
+glob = "tests/conftest.py"
+layers = ["all"]
+[[impact.rule]]
+glob = "pages/*"
+layers = ["ui", "a11y", "visual", "security"]
+[[impact.rule]]
+glob = "suite/schemas.py"
+layers = ["unit", "api"]
+[[impact.rule]]
+glob = "suite/oracles.py"
+layers = ["unit", "property"]
+[[impact.rule]]
+glob = "suite/db.py"
+layers = ["db"]
+[[impact.rule]]
+glob = "sql/*"
+layers = ["db"]
+[[impact.rule]]
+glob = "qualitylens/a11y.py"
+layers = ["unit", "a11y"]
+[[impact.rule]]
+glob = "qualitylens/visual.py"
+layers = ["unit", "visual"]
+[[impact.rule]]
+glob = "qualitylens/http.py"
+layers = ["all"]
+[[impact.rule]]
+glob = "qualitylens/pytest_plugin.py"
+layers = ["all"]
+[[impact.rule]]
+glob = "qualitylens/*"
+layers = ["unit"]
+[[impact.rule]]
+glob = "load/*.py"
+layers = ["load"]
+[[impact.rule]]
+glob = "ai/*"
+layers = ["unit"]
+[[impact.rule]]
+glob = "scripts/bootstrap.sh"
+layers = ["all"]
+[[impact.rule]]
+glob = "scripts/*"
+layers = ["unit"]
+[[impact.rule]]
+glob = "quarantine.toml"
+layers = ["unit"]

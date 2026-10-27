@@ -2,69 +2,38 @@
 
     qualitylens impact --base origin/main      # -> pytest marker expression, or "all" / "none"
 
-The full e2e suite needs a running Gitea and takes minutes; a change to one Page Object cannot break
-the database checks. Each changed path is matched against RULES (first match wins) and the layers of
-all matches are combined. Anything not covered by a rule, and anything shared by every layer
-(fixtures, the API client, dependencies, CI), selects everything, so the selection can only be too
-wide, never too narrow. CI still runs the whole suite on every push; this is for fast local feedback.
+An e2e suite needs the app running and takes minutes; a change to one Page Object cannot break the
+database checks. Each changed path is matched against the project's rules (qualitylens.toml
+`[[impact.rule]]`, first match wins), then the convention that tests/<layer>/ belongs to the marker
+<layer>. Anything not covered, and anything shared by every layer (fixtures, the API client,
+dependencies, CI), selects everything, so the selection can only be too wide, never too narrow. CI
+still runs the whole suite on every push; this is for fast feedback while working.
 """
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterable
 from fnmatch import fnmatch
 
 ALL = "all"
-LAYERS = ("unit", "ui", "api", "db", "security", "a11y", "visual", "property", "load")
-
-# (glob, layers). First match wins, so specific paths come before their folders.
-RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("*.md", ()),
-    ("docs/*", ()),
-    ("bug-reports/*", ()),
-    ("LICENSE", ()),
-    (".github/ISSUE_TEMPLATE/*", ()),
-    ("test-cases/*", ("unit",)),
-    ("tests/unit/*", ("unit",)),
-    ("tests/ui/*", ("ui",)),
-    ("tests/api/test_properties.py", ("property",)),
-    ("tests/api/*", ("api",)),
-    ("tests/db/*", ("db",)),
-    ("tests/security/*", ("security",)),
-    ("tests/a11y/*", ("a11y",)),
-    ("tests/visual/*", ("visual",)),
-    ("pages/*", ("ui", "a11y", "visual", "security")),
-    ("qualitylens/schemas.py", ("unit", "api")),
-    ("qualitylens/oracles.py", ("unit", "property")),
-    ("qualitylens/a11y.py", ("unit", "a11y")),
-    ("qualitylens/visual.py", ("unit", "visual")),
-    ("qualitylens/db.py", ("db",)),
-    ("sql/*", ("db",)),
-    ("load/*", ("load",)),
-    ("ai/*", ("unit",)),
-    ("scripts/bootstrap.sh", (ALL,)),
-    ("scripts/*", ("unit",)),
-    ("quarantine.toml", ("unit",)),
-    ("qualitylens/junit.py", ("unit",)),
-    ("qualitylens/history.py", ("unit",)),
-    ("qualitylens/quarantine.py", ("unit",)),
-    ("qualitylens/impact.py", ("unit",)),
-    ("qualitylens/dashboard.py", ("unit",)),
-    ("qualitylens/doctor.py", ("unit",)),
-    ("qualitylens/cli.py", ("unit",)),
-)
+Rules = Iterable[tuple[str, tuple[str, ...]]]
 
 
-def layers_for(path: str) -> set[str]:
-    for pattern, layers in RULES:
+def layers_for(path: str, rules: Rules, layers: Iterable[str] = ()) -> set[str]:
+    for pattern, selected in rules:
         if fnmatch(path, pattern):
-            return set(layers)
+            return set(selected)
+    parts = path.split("/")
+    if len(parts) > 2 and parts[0] == "tests" and parts[1] in set(layers):
+        return {parts[1]}
     return {ALL}
 
 
-def select(paths: list[str]) -> set[str]:
+def select(paths: list[str], rules: Rules, layers: Iterable[str] = ()) -> set[str]:
+    rules, layers = tuple(rules), tuple(layers)
     chosen: set[str] = set()
     for path in paths:
-        chosen |= layers_for(path.strip())
+        chosen |= layers_for(path.strip(), rules, layers)
     return {ALL} if ALL in chosen else chosen
 
 

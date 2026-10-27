@@ -2,9 +2,9 @@
 import allure
 import pytest
 
-from qualitylens.api_client import GiteaApi
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.api_client import GiteaApi
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.api, allure.feature("API: Authentication")]
 

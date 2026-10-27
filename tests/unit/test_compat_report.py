@@ -1,7 +1,7 @@
 """The Gitea compatibility report: per-version totals, known-bug status, and tests that changed."""
 import pytest
 
-from scripts import compat_report
+from qualitylens import compat as compat_report
 
 pytestmark = pytest.mark.unit
 

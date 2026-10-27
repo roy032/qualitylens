@@ -58,7 +58,7 @@ jobs:
       - name: Run summary
         if: always()
         run: |
-          python scripts/ci_summary.py results/unit.xml >> "$GITHUB_STEP_SUMMARY"
+          python -m qualitylens summary results/unit.xml >> "$GITHUB_STEP_SUMMARY"
           if [ -f results/coverage.md ]; then
             { echo "### Framework coverage"; echo; cat results/coverage.md; } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -81,10 +81,10 @@ jobs:
         run: mutmut run --max-children 4 && mutmut export-cicd-stats
       - name: Mutation score (fails under 90 %)
         run: |
-          python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90 | tee -a "$GITHUB_STEP_SUMMARY"
+          python -m qualitylens mutation-score mutants/mutmut-cicd-stats.json --min 90 | tee -a "$GITHUB_STEP_SUMMARY"
           { echo "<details><summary>Surviving mutants</summary>"; echo; echo '```';
             mutmut results 2>/dev/null; echo '```'; echo "</details>"; } >> "$GITHUB_STEP_SUMMARY"
-          python scripts/mutation_score.py mutants/mutmut-cicd-stats.json --min 90 > /dev/null
+          python -m qualitylens mutation-score mutants/mutmut-cicd-stats.json --min 90 > /dev/null
 
   visual:
     name: Visual regression (pinned Playwright container)
@@ -151,7 +151,7 @@ jobs:
 
       - name: Run summary
         if: always()
-        run: python scripts/ci_summary.py results/*.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python -m qualitylens summary results/*.xml >> "$GITHUB_STEP_SUMMARY"
 
       # Every run is added to a per-test history, which finds flaky tests (outcome flips between runs)
       # and feeds the trends dashboard. Same cache pattern as the Allure and load histories.
@@ -282,12 +282,30 @@ jobs:
       - name: Run summary
         if: always()
         run: |
-          { echo "# ${{ matrix.browser }}"; python scripts/ci_summary.py results/*.xml; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "# ${{ matrix.browser }}"; python -m qualitylens summary results/*.xml; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: failure()
         with:
           name: playwright-failures-${{ matrix.browser }}
           path: test-results
+
+  toolkit:
+    name: Toolkit self-test (qualitylens init on a sample app)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      # Installed the way a user installs it (package + ui extra, no repository requirements), so a missing
+      # dependency or a file left out of the package fails here.
+      - name: Install QualityLens with the ui extra
+        run: |
+          python -m venv /tmp/toolkit
+          /tmp/toolkit/bin/pip install -q ".[ui]"
+          /tmp/toolkit/bin/python -m playwright install --with-deps chromium
+      - name: Scaffold a suite, pass on the healthy app, catch every seeded defect, stop when the app is down
+        run: PATH=/tmp/toolkit/bin:$PATH bash scripts/toolkit_selftest.sh
 
   docker:
     name: Suite container image (build + offline self-test)
@@ -352,7 +370,7 @@ jobs:
         if: always() && hashFiles('load/results/run_stats.csv') != ''
         shell: bash
         run: >
-          python scripts/load_trend.py load/results/run_stats.csv --history load/history/history.json
+          python -m qualitylens load-trend load/results/run_stats.csv --history load/history/history.json
           --label "${GITHUB_SHA::7} (run ${{ github.run_number }})" --max-regression 50 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Save load history
         if: always() && hashFiles('load/history/history.json') != ''

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qualitylens"
-dynamic = ["version", "dependencies"]
-description = "End-to-end QA suite for Gitea with flaky-test tracking, quarantine, impact selection and trend dashboards"
+dynamic = ["version"]
+description = "Test engine for web apps and APIs: runner profiles, flaky-test history and quarantine, impact selection, trend dashboards, and a ready-made suite scaffold"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "zro" }]
@@ -16,8 +16,23 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 
+# Ranges for people installing the engine into their own suite; requirements.txt pins the exact versions
+# this repository's CI runs with (and that pip-audit checks).
+dependencies = ["pytest>=8", "requests>=2.31"]
+
+[project.optional-dependencies]
+ui = ["playwright>=1.45", "pytest-playwright>=0.5", "axe-playwright-python>=0.1.4"]
+visual = ["pillow>=10"]
+db = ["psycopg[binary]>=3.1"]
+all = ["qualitylens[ui,visual,db]"]
+
 [project.scripts]
 qualitylens = "qualitylens.cli:main"
+
+# Loaded by pytest in any project that installs the engine. The name matches the module, so the
+# Gitea suite's `pytest_plugins = ["qualitylens.pytest_plugin"]` does not register it twice.
+[project.entry-points.pytest11]
+"qualitylens.pytest_plugin" = "qualitylens.pytest_plugin"
 
 [project.urls]
 Repository = "https://github.com/roy032/qualitylens"
@@ -27,8 +42,6 @@ packages = ["qualitylens"]
 
 [tool.setuptools.dynamic]
 version = { attr = "qualitylens.__version__" }
-# requirements.txt is the pinned lock file CI installs; the package uses the same pins
-dependencies = { file = ["requirements.txt"] }
 
 # --- lint and types (CI job "lint") -----------------------------------------
 [tool.ruff]
@@ -49,7 +62,7 @@ ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["qualitylens", "scripts", "ai"]
+files = ["qualitylens", "suite", "scripts", "ai"]
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true

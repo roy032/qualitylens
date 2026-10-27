@@ -25,7 +25,7 @@ bash scripts/bootstrap.sh || { echo "Could not start the app. Is Docker running?
 rm -rf results allure-results
 step "3/5 Smoke tests"
 pytest -m smoke -n auto -q --alluredir=allure-results --junitxml=results/smoke.xml || {
-  echo "Smoke tests failed, so the full run was skipped."; python scripts/ci_summary.py results/*.xml; exit 1; }
+  echo "Smoke tests failed, so the full run was skipped."; python -m qualitylens summary results/*.xml; exit 1; }
 
 step "4/5 Full suite (parallel), then whole-database integrity rules"
 pytest -m "not smoke and not serial and not visual and not quarantined" -n auto -q --alluredir=allure-results --junitxml=results/regression.xml
@@ -34,7 +34,7 @@ pytest -m serial -q --alluredir=allure-results --junitxml=results/integrity.xml
 integrity=$?
 
 step "5/5 Summary"
-python scripts/ci_summary.py results/*.xml | tee results/summary.md
+python -m qualitylens summary results/*.xml | tee results/summary.md
 echo
 echo "Summary: results/summary.md   Allure: make report (or npx allure-commandline serve allure-results)"
 echo "Gitea:   http://localhost:3000 (qa_admin / QaAdmin#2026)"

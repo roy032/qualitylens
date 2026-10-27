@@ -1,3 +1,6 @@
-"""Shared test framework code: configuration, API client, DB access, test data, and the reports around them."""
+"""QualityLens engine: project config, pytest plugin, CLI, test history, flaky-test quarantine and reports.
 
-__version__ = "1.1.0"
+App-specific code lives in the suite that uses it (in this repository: `suite/` and `tests/` for Gitea).
+"""
+
+__version__ = "2.0.0"

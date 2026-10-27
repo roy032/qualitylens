@@ -2,8 +2,8 @@
 import allure
 import pytest
 
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.api, allure.feature("API: Repositories")]
 OWNER = settings.admin_user

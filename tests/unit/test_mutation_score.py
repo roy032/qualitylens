@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from scripts import mutation_score
+from qualitylens import mutation as mutation_score
 
 pytestmark = pytest.mark.unit
 

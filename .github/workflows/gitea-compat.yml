@@ -74,7 +74,7 @@ jobs:
       - name: Compare versions
         run: |
           args=$(ls -d junit/junit-gitea-* | sort -V | sed -E 's|^junit/junit-gitea-(.*)$|\1=&|')
-          python scripts/compat_report.py $args | tee compat.md >> "$GITHUB_STEP_SUMMARY"
+          python -m qualitylens compat $args | tee compat.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         with:
           name: compatibility-report

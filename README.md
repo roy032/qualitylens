@@ -7,6 +7,10 @@ measured against the hand-written suite.
 The system under test is **[Gitea](https://about.gitea.com) 1.22.6**, an open-source Git service, running
 locally in Docker with PostgreSQL.
 
+**Testing your own app?** The engine is reusable: `qualitylens init --url http://localhost:8000` writes a
+ready-to-run suite (API, browser, accessibility, CI workflow, history and flaky-test tracking) for any web
+app or HTTP API. See [docs/toolkit.md](docs/toolkit.md).
+
 | | |
 |---|---|
 | Manual test cases | 86, each traced to an automated test ([CSV](test-cases/manual_test_cases.csv)) |
@@ -23,7 +27,8 @@ locally in Docker with PostgreSQL.
 | Load test | 20 users, 0 % errors, p95 180 ms, with pass/fail thresholds and a trend check against recent runs ([baseline](load/README.md)) |
 | Flaky tests | Every CI run goes into a per-test history; tests whose outcome keeps flipping are flagged and quarantined with an owner and an expiry, never retried ([how](CONTRIBUTING.md#flaky-tests)) |
 | Trends | HTML dashboard of failures per run, suite time, flaky, failing and slowest tests, published next to the Allure report |
-| Tooling | `qualitylens` command (`doctor`, `run`, `impact`, `flaky`, `dashboard`), pip-installable, Docker image with browsers included |
+| Tooling | `qualitylens` command (`init`, `doctor`, `run`, `impact`, `flaky`, `dashboard`), pip-installable, Docker image with browsers included |
+| Reusable engine | Gitea specifics live in `qualitylens.toml` and `suite/`; `qualitylens init` scaffolds a suite for any app, proven in CI on a sample app with seeded defects ([guide](docs/toolkit.md)) |
 | Supply chain | Ruff and mypy gates, pip-audit on every push, Dependabot, SHA-pinned Actions, read-only CI tokens, SBOM on every release |
 | AI generator | 94 % of the manual "Issues" cases reproduced; found a case the manual suite missed ([review](ai/output/create_issue.review.md)) |
 
@@ -104,6 +109,7 @@ pytest --alluredir=allure-results
 `make install` also installs the `qualitylens` command (or run `python -m qualitylens`):
 
 ```bash
+qualitylens init DIR --url URL        # a new suite for any web app or API (docs/toolkit.md)
 qualitylens doctor                    # Python, packages, browser, Docker, Gitea, admin login, PostgreSQL: ✓ or how to fix
 qualitylens run smoke                 # profiles: smoke, fast, full, impacted, quarantined, or a layer (ui, api, ...)
 qualitylens run impacted              # only the layers your branch can affect, from git diff origin/main
@@ -113,6 +119,8 @@ qualitylens dashboard                 # test-history/trends.html
 qualitylens quarantine check          # quarantine.toml: owner, reason, expiry, test still exists
 ```
 
+What each command targets (URLs, layers, profiles, impact rules, history) comes from
+[`qualitylens.toml`](qualitylens.toml); `--config` picks another file.
 Arguments after `--` go to pytest (`qualitylens run ui -- --headed -x`). `qualitylens impact -v` shows why
 each changed file selects the layers it does; anything shared, or unknown, selects everything.
 
@@ -168,9 +176,13 @@ A walkthrough for showing the project to someone, after `make up`:
 ```
 docker-compose.yml        target app: Gitea + PostgreSQL, versions pinned
 scripts/bootstrap.sh      start the app and create the admin account (idempotent)
-qualitylens/              framework: config, API client, read-only DB helper, test data factory,
-                          response schemas (schemas.py), axe-core wrapper (a11y.py),
-                          expected-behaviour models for property tests (oracles.py)
+qualitylens.toml          what the engine tests here: Gitea URL, login, database, layers, profiles, impact rules
+qualitylens/              the engine (app-agnostic): CLI, pytest plugin, project config (project.py),
+                          HTTP client (http.py), axe-core wrapper (a11y.py), reports, `init` scaffold
+suite/                    Gitea-specific code: settings, API client, read-only DB helper, test data factory,
+                          response schemas (schemas.py), expected-behaviour models for property tests (oracles.py)
+examples/sample-app/      static site the toolkit self-test scaffolds a suite for (scripts/toolkit_selftest.sh)
+docs/toolkit.md           using QualityLens on your own app
 pages/                    Page Objects (login, register, dashboard, repo, issues)
 tests/ui|api|db|unit      automated tests, markers: smoke ui api db security a11y property unit serial known_bug
 tests/api/test_properties.py  Hypothesis property and state-machine tests (profiles in tests/conftest.py)
@@ -185,16 +197,16 @@ quarantine.toml           flaky tests that must not block CI (qualitylens/quaran
 pyproject.toml            package, CLI entry point, ruff and mypy settings (requirements*.txt hold the pins)
 Dockerfile                the suite as an image, browsers included
 load/                     Locust scenario with SLO thresholds, baseline results
-scripts/load_trend.py     load results vs the median of recent runs, per endpoint; history kept in CI cache
+qualitylens/load_trend.py load results vs the median of recent runs, per endpoint; history kept in CI cache
 test-cases/               manual test cases (CSV, opens in Excel)
 bug-reports/              12 bug reports + evidence/ (HTTP logs, screenshots)
 scripts/capture_evidence.py  reproduces every bug from scratch and refreshes evidence/
 ai/                       story -> test cases (generate.py), comparison (evaluate.py), sample output + review
 docs/test-plan.md         STLC test plan: scope, techniques, entry/exit criteria
 docs/accessibility.md     accessibility audit of Gitea 1.22.6
-scripts/ci_summary.py     JUnit XML -> Markdown run summary; --runs finds flaky tests
-scripts/compat_report.py  same suite on several Gitea versions -> what an upgrade breaks or fixes
-scripts/mutation_score.py mutmut stats -> score and CI gate; config in setup.cfg (coverage: .coveragerc)
+qualitylens/summary.py    JUnit XML -> Markdown run summary (`qualitylens summary`); --runs finds flaky tests
+qualitylens/compat.py     same suite on several app versions -> what an upgrade breaks or fixes
+qualitylens/mutation.py   mutmut stats -> score and CI gate; config in setup.cfg (coverage: .coveragerc)
 scripts/run.sh, run.ps1   one command from a fresh clone to a summarised run
 docs/gitea-compatibility.md  upgrade report: Gitea 1.22.6 vs 28.2.0
 .github/workflows/ci.yml  CI pipeline
@@ -293,6 +305,9 @@ second story ready to run.
    Then compares every endpoint with the median of recent runs and fails if overall p95 is more than 50 % above it.
 5. **ai-eval**: regenerates cases if an `ANTHROPIC_API_KEY` secret exists, then evaluates them.
 6. **docker**: builds the suite image and runs the CLI and the offline unit suite inside it.
+7. **toolkit**: installs the package as a user would, scaffolds a suite for `examples/sample-app` with
+   `qualitylens init`, and requires it to pass on the healthy site, catch each seeded defect (broken link,
+   JavaScript error, missing alt text) and stop with exit code 3 when the site is down.
 
 Every job runs with a read-only repository token, and every action is pinned to a commit SHA
 (Dependabot keeps them current). Releases come from **Actions > Release > Run workflow**, which tags the

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import ci_summary
+from qualitylens import summary as ci_summary
 
 pytestmark = pytest.mark.unit
 

@@ -4,9 +4,18 @@ All notable changes to QualityLens. The format follows [Keep a Changelog](https:
 and versions follow [Semantic Versioning](https://semver.org/). A release is cut with the
 [Release workflow](.github/workflows/release.yml), which uses the section below as its notes.
 
-## [1.1.0] - unreleased
+## [2.0.0] - unreleased
 
 ### Added
+- Reusable engine: `qualitylens.toml` describes the app under test (URL, health check, login, database,
+  layers, profiles, impact rules, history and flaky settings), so the engine runs any pytest suite.
+- `qualitylens init`: scaffolds a ready-to-run suite for any web app or HTTP API (API and browser
+  baselines, accessibility, CI workflow with history and flaky tracking). Guide: `docs/toolkit.md`.
+- `qualitylens.http.ApiClient` and the plugin fixtures `api` and `ql_project`; the plugin stops a run
+  with the start hint when the app is down, for any project.
+- `qualitylens summary | load-trend | compat | mutation-score` (were `scripts/*.py`).
+- CI job "toolkit": the scaffolded suite must pass on a sample app, catch seeded defects and stop when
+  the app is down.
 - `qualitylens` command (`pip install -e .`, or `python -m qualitylens`): `doctor`, `run <profile>`,
   `impact`, `history add`, `flaky`, `quarantine check`, `dashboard`.
 - Test history across CI runs and flaky-test scoring by outcome flip rate; flaky tests are listed in the
@@ -27,6 +36,11 @@ and versions follow [Semantic Versioning](https://semver.org/). A release is cut
   (Firefox, WebKit), load trend tracking and the weekly deep-fuzz workflow (PR #4).
 
 ### Changed
+- **Breaking:** Gitea-specific modules moved from `qualitylens` to `suite` (`config`, `api_client`, `data`,
+  `db`, `oracles`, `schemas`); `qualitylens.api_client.GiteaApi` is now `suite.api_client.GiteaApi`.
+- The package installs only `pytest` and `requests`; browser, visual and database support are the extras
+  `ui`, `visual` and `db` (`all` for everything).
+- `doctor` checks what `qualitylens.toml` configures instead of a fixed Gitea list.
 - CI jobs run with read-only repository permissions by default.
 - `pytest -m unit` (and `make unit`) now works without a running Gitea.
 

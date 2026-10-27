@@ -37,7 +37,7 @@ Step "3/5 Smoke tests"
 pytest -m smoke -n auto -q --alluredir=allure-results --junitxml=results/smoke.xml
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Smoke tests failed, so the full run was skipped." -ForegroundColor Red
-    python scripts/ci_summary.py (Get-ChildItem results\*.xml).FullName; exit 1
+    python -m qualitylens summary (Get-ChildItem results\*.xml).FullName; exit 1
 }
 
 Step "4/5 Full suite (parallel), then whole-database integrity rules"
@@ -48,7 +48,7 @@ $integrity = $LASTEXITCODE
 
 Step "5/5 Summary"
 $env:PYTHONIOENCODING = "utf-8"
-python scripts/ci_summary.py (Get-ChildItem results\*.xml).FullName | Tee-Object -FilePath results\summary.md
+python -m qualitylens summary (Get-ChildItem results\*.xml).FullName | Tee-Object -FilePath results\summary.md
 Write-Host "`nSummary: results\summary.md   Gitea: http://localhost:3000 ($admin / $password)"
 if ($Report) { npx --yes allure-commandline@2.30.0 serve allure-results }
 if ($Down) { docker compose down -v }

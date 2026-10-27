@@ -6,9 +6,9 @@ answer. Each failure lists every broken field at once, so one run shows the whol
 import allure
 import pytest
 
-from qualitylens import schemas
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite import schemas
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.api, allure.feature("API: Contracts")]
 OWNER = settings.admin_user

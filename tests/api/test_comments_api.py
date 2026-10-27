@@ -2,7 +2,7 @@
 import allure
 import pytest
 
-from qualitylens.config import settings
+from suite.config import settings
 
 pytestmark = [pytest.mark.api, allure.feature("API: Comments")]
 OWNER = settings.admin_user

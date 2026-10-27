@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from scripts import load_trend
+from qualitylens import load_trend
 
 pytestmark = pytest.mark.unit
 

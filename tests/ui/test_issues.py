@@ -4,8 +4,8 @@ import pytest
 from playwright.sync_api import expect
 
 from pages.issue_pages import IssueListPage, IssuePage, NewIssuePage
-from qualitylens.config import settings
-from qualitylens.data import unique
+from suite.config import settings
+from suite.data import unique
 
 pytestmark = [pytest.mark.ui, allure.feature("Issues")]
 OWNER = settings.admin_user
