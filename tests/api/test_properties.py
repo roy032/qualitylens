@@ -12,7 +12,9 @@ with random seeds and ten times more examples. Profiles are defined in tests/con
 """
 import allure
 import pytest
-from hypothesis import HealthCheck, assume, given, settings as hsettings, strategies as st
+from hypothesis import HealthCheck, assume, given
+from hypothesis import settings as hsettings
+from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, rule, run_state_machine_as_test
 
 from qualitylens import oracles

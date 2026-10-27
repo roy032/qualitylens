@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qualitylens"
+dynamic = ["version", "dependencies"]
+description = "End-to-end QA suite for Gitea with flaky-test tracking, quarantine, impact selection and trend dashboards"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "zro" }]
+classifiers = [
+    "Framework :: Pytest",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.scripts]
+qualitylens = "qualitylens.cli:main"
+
+[project.urls]
+Repository = "https://github.com/roy032/qualitylens"
+
+[tool.setuptools]
+packages = ["qualitylens"]
+
+[tool.setuptools.dynamic]
+version = { attr = "qualitylens.__version__" }
+# requirements.txt is the pinned lock file CI installs; the package uses the same pins
+dependencies = { file = ["requirements.txt"] }
+
+# --- lint and types (CI job "lint") -----------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["mutants"]
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, import order, bugbear, pyupgrade, simplify, pylint errors, unused noqa
+select = ["F", "E", "W", "I", "B", "UP", "SIM", "PLE", "RUF100"]
+# long lines are left to review: several hold literal HTTP payloads and expected report rows
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# literal invisible characters are the point of these tests (Go's whitespace set vs Python's)
+"tests/unit/test_oracles.py" = ["PLE2515"]
+"tests/api/test_properties.py" = ["PLE2515"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["qualitylens", "scripts", "ai"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true

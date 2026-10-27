@@ -10,17 +10,21 @@ locally in Docker with PostgreSQL.
 | | |
 |---|---|
 | Manual test cases | 86, each traced to an automated test ([CSV](test-cases/manual_test_cases.csv)) |
-| Automated tests | 444: 29 UI, 105 API, 13 database, 43 security, 13 accessibility, 9 visual, 232 offline unit/traceability |
+| Automated tests | 589: 29 UI, 105 API, 13 database, 43 security, 13 accessibility, 9 visual, 377 offline unit/traceability |
 | Bugs found | 12 confirmed in Gitea 1.22.6 (all still open in 28.2.0): one found by the AI layer, two by property-based tests ([reports](bug-reports/README.md)) |
 | Security | Access control between users, stored XSS, CSRF, cookies, clickjacking, SQL metacharacters, path traversal |
 | Property-based | Hypothesis generates hundreds of inputs per rule (any Unicode, odd numbers, unusual names) and a state machine checks random issue workflows against a model; found BUG-011 and BUG-012 ([details](#property-based-tests)) |
 | Cross-browser | The UI suite runs on Chromium, Firefox and WebKit in CI |
 | Accessibility | 9 screens scanned against WCAG 2.1 AA with axe-core, regressions fail the build ([audit](docs/accessibility.md)) |
 | Visual regression | 8 screens compared pixel by pixel with approved baselines, in a pinned browser container so results match on every machine |
-| Tests of the tests | 97 % branch coverage of the framework's logic and a 95.1 % mutation score, both gated in CI ([details](#testing-the-tests)) |
+| Tests of the tests | 96 % branch coverage of the framework's logic and a 95.9 % mutation score, both gated in CI ([details](#testing-the-tests)) |
 | Upgrade readiness | Weekly run of the whole suite on the pinned Gitea and on 28.x. On 28.2.0: all 10 bugs still open, a new 500 error, 6 new a11y violations ([report](docs/gitea-compatibility.md)) |
 | CI | Parallel run (about 2 minutes for the browser, API and DB suites), Firefox/WebKit matrix, Allure trend history, per-layer run summary, weekly flake hunt and deep fuzz |
 | Load test | 20 users, 0 % errors, p95 180 ms, with pass/fail thresholds and a trend check against recent runs ([baseline](load/README.md)) |
+| Flaky tests | Every CI run goes into a per-test history; tests whose outcome keeps flipping are flagged and quarantined with an owner and an expiry, never retried ([how](CONTRIBUTING.md#flaky-tests)) |
+| Trends | HTML dashboard of failures per run, suite time, flaky, failing and slowest tests, published next to the Allure report |
+| Tooling | `qualitylens` command (`doctor`, `run`, `impact`, `flaky`, `dashboard`), pip-installable, Docker image with browsers included |
+| Supply chain | Ruff and mypy gates, pip-audit on every push, Dependabot, SHA-pinned Actions, read-only CI tokens, SBOM on every release |
 | AI generator | 94 % of the manual "Issues" cases reproduced; found a case the manual suite missed ([review](ai/output/create_issue.review.md)) |
 
 ![Allure report](docs/img/allure-overview.png)
@@ -55,12 +59,13 @@ flowchart LR
     J --> EV --> R["report: valid / new /<br/>duplicate / missed"]
 
     Suite --> AL["Allure report"]
+    Suite -- "JUnit XML" --> H["test history<br/>flip-rate flaky score<br/>quarantine.toml"] --> TD["trends.html"]
     CI["GitHub Actions<br/>every push"] --> Suite & L & EV
 ```
 
 ## Run it
 
-Needs Docker and Python 3.12+. **One command** installs everything, starts Gitea, runs the smoke tests,
+Needs Docker and Python 3.12+ (or only Docker, see [the suite image](#the-qualitylens-command)). **One command** installs everything, starts Gitea, runs the smoke tests,
 then the full suite, and prints a summary:
 
 ```bash
@@ -92,6 +97,32 @@ docker compose up -d --wait
 docker compose exec -T -u git gitea gitea admin user create --admin --username qa_admin `
   --password "QaAdmin#2026" --email qa_admin@example.com --must-change-password=false
 pytest --alluredir=allure-results
+```
+
+## The `qualitylens` command
+
+`make install` also installs the `qualitylens` command (or run `python -m qualitylens`):
+
+```bash
+qualitylens doctor                    # Python, packages, browser, Docker, Gitea, admin login, PostgreSQL: ✓ or how to fix
+qualitylens run smoke                 # profiles: smoke, fast, full, impacted, quarantined, or a layer (ui, api, ...)
+qualitylens run impacted              # only the layers your branch can affect, from git diff origin/main
+qualitylens run fast --record         # ... and add the results to test-history/history.json
+qualitylens flaky                     # tests whose outcome flips between runs, quarantined or not
+qualitylens dashboard                 # test-history/trends.html
+qualitylens quarantine check          # quarantine.toml: owner, reason, expiry, test still exists
+```
+
+Arguments after `--` go to pytest (`qualitylens run ui -- --headed -x`). `qualitylens impact -v` shows why
+each changed file selects the layers it does; anything shared, or unknown, selects everything.
+
+**No local Python:** `make docker` (or `docker build -t qualitylens .`) builds an image with the suite,
+its dependencies and the browsers, based on the same pinned Playwright image as the visual tests:
+
+```bash
+docker run --rm --network host qualitylens doctor
+docker run --rm --network host -v "$PWD/results:/suite/results" qualitylens run fast --record
+docker run --rm -e QL_BASE_URL=https://gitea.test.example -e QL_ADMIN_PASSWORD=... qualitylens run smoke
 ```
 
 ## Demo in five minutes
@@ -148,6 +179,11 @@ tests/a11y                axe-core scans + baseline.json of known WCAG failures
 tests/visual              screenshot comparison; baseline/<gitea version>/*.png are the approved looks
 qualitylens/visual.py     pixel comparison with tolerance, diff image with changes in magenta
 sql/integrity_checks.sql  data-integrity rules, also runnable by hand in psql
+qualitylens/cli.py        the qualitylens command; doctor.py (environment checks), impact.py (test selection)
+qualitylens/history.py    per-test history across runs, flip-rate flaky scoring; dashboard.py renders it
+quarantine.toml           flaky tests that must not block CI (qualitylens/quarantine.py, pytest_plugin.py)
+pyproject.toml            package, CLI entry point, ruff and mypy settings (requirements*.txt hold the pins)
+Dockerfile                the suite as an image, browsers included
 load/                     Locust scenario with SLO thresholds, baseline results
 scripts/load_trend.py     load results vs the median of recent runs, per endpoint; history kept in CI cache
 test-cases/               manual test cases (CSV, opens in Excel)
@@ -165,6 +201,8 @@ docs/gitea-compatibility.md  upgrade report: Gitea 1.22.6 vs 28.2.0
 .github/workflows/flake-hunt.yml  weekly: run the suite 3 times, fail on any test whose result changed
 .github/workflows/deep-fuzz.yml   weekly: property tests with random seeds and 10x the examples
 .github/workflows/gitea-compat.yml  weekly: whole suite on the pinned and newer Gitea, compatibility report
+.github/workflows/release.yml  tag + GitHub release + wheel + SBOM from one button
+CONTRIBUTING.md           set-up, adding tests and bugs, flaky-test policy, quality gates, releases
 ```
 
 ## Coverage summary
@@ -175,13 +213,11 @@ Manual cases per feature (`test-cases/manual_test_cases.csv`):
 |---|---:|---|---:|
 | Issues | 18 | Security | 10 |
 | Registration | 10 | Property-based | 10 |
-| Login | 7 | | |
-| Repositories | 6 | API authentication | 6 |
-| Milestones | 5 | Visual | 5 |
-| Database integrity | 4 | Property-based | Hypothesis generates hundreds of inputs per rule (any Unicode, odd numbers, unusual names) and a state machine checks random issue workflows against a model; found BUG-011 and BUG-012 ([details](#property-based-tests)) |
-| Cross-browser | The UI suite runs on Chromium, Firefox and WebKit in CI |
-| Accessibility | 3 |
-| Comments | 2 | **Total** | **86** |
+| Login | 7 | API authentication | 6 |
+| Repositories | 6 | Visual | 5 |
+| Milestones | 5 | Accessibility | 3 |
+| Database integrity | 4 | Comments | 2 |
+| | | **Total** | **86** |
 
 Automated tests per layer (v1.0 run on Gitea 1.22.6):
 
@@ -193,8 +229,8 @@ Automated tests per layer (v1.0 run on Gitea 1.22.6):
 | Security | 43 | Access control between two users, stored XSS, Markdown sanitiser, CSRF, cookies, clickjacking, injection |
 | Accessibility (axe-core) | 13 | WCAG 2.1 AA on 9 screens against a baseline, keyboard-only sign-in, labelled fields |
 | Visual | 9 | 8 screens against approved screenshots, plus a check that a small change is caught |
-| Offline unit and traceability | 232 | Framework logic (97 % coverage, 95.1 % mutation score) and manual-to-automated links |
-| **Total** | **444** | |
+| Offline unit and traceability | 377 | Framework logic and tooling (96 % coverage, 95.9 % mutation score) and manual-to-automated links |
+| **Total** | **589** | |
 
 Every manual case names the automated test that covers it, and `tests/unit/test_traceability.py` fails
 the build if a referenced test is renamed or deleted.
@@ -241,17 +277,26 @@ second story ready to run.
 
 `.github/workflows/ci.yml` runs on every push and pull request:
 
+0. **lint**: ruff, mypy, `pip-audit` against known vulnerabilities, quarantine list validity, and a
+   package build whose installed CLI must start.
 1. **unit**: offline tests of the framework, evaluator and traceability, with branch coverage (fails under 90 %).
    Then, in parallel with everything below: **mutation** (fails under a 90 % mutation score) and
    **visual** (screenshot comparison in the pinned Playwright container).
 2. **e2e**: starts Gitea + Postgres in the runner, runs smoke tests first, then the full UI/API/DB suite.
-   Any unexpected failure, or a known bug that starts passing, fails the build. Builds the Allure report
+   Any unexpected failure, or a known bug that starts passing, fails the build. Quarantined tests run
+   in a separate step that cannot fail it. The run is added to the test history (CI cache), the
+   flaky-test report goes into the job summary, and `trends.html` is built (artifact `test-trends`). Builds the Allure report
    (artifact on every run; also published to GitHub Pages on `main` when Pages is set to "GitHub Actions"
    and the repository variable `PUBLISH_PAGES` is `true`).
 3. **cross-browser**: the UI suite on Firefox and WebKit (Chromium runs in **e2e**).
 4. **load**: 60 s Locust run; fails on more than 1 % errors or p95 above 1200 ms (800 ms locally; shared CI runners are slower, see [load/README.md](load/README.md#ci)).
    Then compares every endpoint with the median of recent runs and fails if overall p95 is more than 50 % above it.
 5. **ai-eval**: regenerates cases if an `ANTHROPIC_API_KEY` secret exists, then evaluates them.
+6. **docker**: builds the suite image and runs the CLI and the offline unit suite inside it.
+
+Every job runs with a read-only repository token, and every action is pinned to a commit SHA
+(Dependabot keeps them current). Releases come from **Actions > Release > Run workflow**, which tags the
+commit and publishes the wheel, an SBOM and the changelog section; see [CONTRIBUTING.md](CONTRIBUTING.md#releases).
 
 Three scheduled workflows complete the picture: `flake-hunt.yml` (the suite 3 times, any changed result
 fails), `deep-fuzz.yml` (property tests with random seeds and ten times the examples) and `gitea-compat.yml`
@@ -264,7 +309,7 @@ evaluator's matching had a bug, tests could pass for the wrong reason. So the fr
 own checks:
 
 - **Coverage** (`make coverage`): branch coverage of the logic modules measured by the offline unit
-  tests, gated at 90 % (currently 97 %). Modules that only make sense against a live Gitea (API client,
+  tests, gated at 90 % (currently 96 %). Modules that only make sense against a live Gitea (API client,
   DB helper) are exercised by the e2e suite and excluded, see `.coveragerc`.
 - **Mutation testing** (`make mutation`, [mutmut](https://github.com/boxed/mutmut)): mutmut makes about
   1,400 small changes to that logic (`>` to `>=`, `+=` to `=`, a changed string or constant) and re-runs the
@@ -273,8 +318,9 @@ own checks:
   checked that one AI case can match only one manual case, that the match and duplicate thresholds are
   inclusive, or what the evaluator's report and CLI actually print. The tests added for them raised the
   score to 96.4 %, and CI now fails below 90 %. With the property-test oracles and the load-trend script
-  added it is 95.1 % (1,404 mutants). Most of the 69 survivors are equivalent mutants (for example
-  `"PNG"` vs `"png"`, which Pillow treats the same) or command-line help text.
+  added it was 95.1 %; with the test-history, quarantine and impact-selection logic it is 95.9 %
+  (1,745 mutants). Most of the 72 survivors are equivalent mutants (for example `"PNG"` vs `"png"`, which
+  Pillow treats the same) or command-line help text.
 
 ## Property-based tests
 

@@ -14,9 +14,10 @@ import sys
 from pathlib import Path
 
 try:
-    from scripts.ci_summary import OUTCOMES, Result, parse
-except ImportError:  # run as a script: python scripts/compat_report.py
-    from ci_summary import OUTCOMES, Result, parse
+    from qualitylens.junit import OUTCOMES, Result, parse
+except ImportError:  # run as a script from another directory: python scripts/compat_report.py
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from qualitylens.junit import OUTCOMES, Result, parse
 
 BUG_ID = re.compile(r"BUG-\d+")
 

@@ -12,44 +12,21 @@ the exit code is 1 when there are any.
 from __future__ import annotations
 
 import sys
-import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 
-OUTCOMES = ("passed", "failed", "known bug", "skipped")
+try:
+    from qualitylens.junit import OUTCOMES, Result, parse
+except ImportError:  # run as a script from another directory: python scripts/ci_summary.py
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from qualitylens.junit import OUTCOMES, Result, parse
 
-
-@dataclass(frozen=True)
-class Result:
-    test_id: str
-    layer: str
-    outcome: str
-    seconds: float
-    message: str = ""
-
-
-def parse(path: Path) -> list[Result]:
-    results = []
-    for case in ET.parse(path).getroot().iter("testcase"):
-        classname = case.get("classname", "")
-        parts = classname.split(".")
-        layer = parts[1] if len(parts) > 2 and parts[0] == "tests" else "other"
-        outcome, message = "passed", ""
-        for child in case:
-            if child.tag in ("failure", "error"):
-                outcome, message = "failed", child.get("message", "")
-            elif child.tag == "skipped":
-                is_xfail = child.get("type") == "pytest.xfail"
-                outcome, message = ("known bug" if is_xfail else "skipped"), child.get("message", "")
-        test_id = f"{classname.replace('.', '/')}.py::{case.get('name')}"
-        results.append(Result(test_id, layer, outcome, float(case.get("time") or 0), message))
-    return results
+__all__ = ["OUTCOMES", "Result", "flaky", "layer_table", "main", "parse", "summarize"]
 
 
 def layer_table(results: list[Result]) -> list[str]:
     by_layer: dict[str, Counter] = defaultdict(Counter)
-    seconds: Counter = Counter()
+    seconds: dict[str, float] = defaultdict(float)
     for r in results:
         by_layer[r.layer][r.outcome] += 1
         seconds[r.layer] += r.seconds

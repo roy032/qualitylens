@@ -1,0 +1,7 @@
+# Tools for the lint job and local development (CI: pip install -r requirements.txt -r requirements-dev.txt)
+ruff==0.17.2
+mypy==2.4.0
+types-requests==2.33.0.20261006
+pip-audit==2.10.1
+build==1.6.1
+pre-commit==4.7.0

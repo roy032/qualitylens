@@ -23,7 +23,7 @@ def test_label_can_be_applied_to_issue(api, repo, issue):
     label = api._ok(api.create_label(OWNER, repo["name"], "priority-high"))
     resp = api.post(f"/repos/{OWNER}/{repo['name']}/issues/{issue['number']}/labels", json={"labels": [label["id"]]})
     assert resp.status_code == 200
-    assert [l["name"] for l in api.get_issue(OWNER, repo["name"], issue["number"]).json()["labels"]] == ["priority-high"]
+    assert [lbl["name"] for lbl in api.get_issue(OWNER, repo["name"], issue["number"]).json()["labels"]] == ["priority-high"]
 
 
 @pytest.mark.known_bug

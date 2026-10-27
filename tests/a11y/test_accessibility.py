@@ -43,7 +43,7 @@ def check_page(page, name: str):
                   attachment_type=allure.attachment_type.JSON)
     fixed = a11y.fixed_rules(found, BASELINE[name])
     if fixed:
-        warnings.warn(f"{name}: baseline rules no longer fire, remove them from baseline.json: {fixed}")
+        warnings.warn(f"{name}: baseline rules no longer fire, remove them from baseline.json: {fixed}", stacklevel=2)
     regressions = a11y.new_violations(found, BASELINE[name])
     assert regressions == [], "New accessibility violations:\n" + "\n".join(v.describe() for v in regressions)
 

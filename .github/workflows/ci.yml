@@ -5,6 +5,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: jobs only read the repository; publish-report asks for its own Pages permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,12 +18,36 @@ env:
   E2E_MARKERS: "(ui or api or db or security or a11y)"
 
 jobs:
+  lint:
+    name: Lint, types, dependency audit, package build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Ruff (lint and import order)
+        run: ruff check --output-format=github .
+      - name: Mypy (framework, scripts, AI layer)
+        run: mypy
+      - name: Quarantine list is valid (owner, reason, not expired, test exists)
+        run: python -m qualitylens quarantine check
+      - name: Known vulnerabilities in pinned dependencies (pip-audit, OSV + PyPI advisories)
+        run: pip-audit -r requirements.txt --strict --progress-spinner off
+      - name: Build the package and smoke-test the installed CLI
+        run: |
+          python -m build --outdir dist
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install -q dist/*.whl
+          /tmp/wheel-check/bin/qualitylens --version
+          /tmp/wheel-check/bin/qualitylens impact README.md
+
   unit:
     name: Unit tests (offline)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - name: Unit tests with branch coverage (fails under 90 %, see .coveragerc)
@@ -34,7 +62,7 @@ jobs:
           if [ -f results/coverage.md ]; then
             { echo "### Framework coverage"; echo; cat results/coverage.md; } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: always()
         with:
           name: coverage
@@ -45,8 +73,8 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt mutmut==3.8.0
       - name: Mutate the framework's logic and re-run the unit tests against every mutant
@@ -63,13 +91,13 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - name: Start Gitea + PostgreSQL and create the admin user
         run: bash scripts/bootstrap.sh
       # Same image locally and in CI, so fonts and rendering are identical and baselines are portable.
       - name: Compare 8 screens with tests/visual/baseline/<gitea version>/
         run: make visual
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: failure()
         with:
           name: visual-diffs
@@ -80,8 +108,8 @@ jobs:
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
 
       - name: Start Gitea + PostgreSQL (warms up while dependencies install)
@@ -90,7 +118,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
@@ -104,22 +132,58 @@ jobs:
 
       - name: Full regression suite (parallel)
         run: >
-          pytest -m "$E2E_MARKERS and not smoke and not serial and not visual" -n auto
+          pytest -m "$E2E_MARKERS and not smoke and not serial and not visual and not quarantined" -n auto
           --alluredir=allure-results --junitxml=results/regression.xml
           --screenshot=only-on-failure --output=test-results
 
       - name: Whole-database integrity rules (alone, after every other test has written its data)
         if: success() || failure()
-        run: pytest -m serial --alluredir=allure-results --junitxml=results/integrity.xml
+        run: pytest -m "serial and not quarantined" --alluredir=allure-results --junitxml=results/integrity.xml
+
+      # Quarantined tests (quarantine.toml) still run so their history is recorded, but cannot fail the build.
+      - name: Quarantined tests (non-blocking)
+        if: success() || failure()
+        continue-on-error: true
+        run: |
+          pytest -m "$E2E_MARKERS and quarantined" -n auto --junitxml=results/quarantined.xml -q || code=$?
+          [ "${code:-0}" -eq 5 ] && echo "No quarantined tests." && exit 0
+          exit "${code:-0}"
 
       - name: Run summary
         if: always()
         run: python scripts/ci_summary.py results/*.xml >> "$GITHUB_STEP_SUMMARY"
 
+      # Every run is added to a per-test history, which finds flaky tests (outcome flips between runs)
+      # and feeds the trends dashboard. Same cache pattern as the Allure and load histories.
+      - name: Restore test history
+        if: always()
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: test-history
+          key: test-history-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            test-history-${{ github.ref_name }}-
+            test-history-main-
+
+      - name: Record this run, report flaky tests, build the trends dashboard
+        if: always() && hashFiles('results/*.xml') != ''
+        shell: bash
+        run: |
+          python -m qualitylens history add results/*.xml --label "${GITHUB_SHA::7} (run ${{ github.run_number }})"
+          python -m qualitylens flaky | tee -a "$GITHUB_STEP_SUMMARY"
+          python -m qualitylens dashboard --out test-history/trends.html
+
+      - name: Save test history
+        if: always() && hashFiles('test-history/history.json') != ''
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: test-history
+          key: test-history-${{ github.ref_name }}-${{ github.run_id }}
+
       # Allure trend charts need the history/ folder of the previous report.
       - name: Restore Allure history
         if: always()
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: allure-history
           key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
@@ -145,27 +209,35 @@ jobs:
           JSON
           npx --yes allure-commandline@2.30.0 generate allure-results -o allure-report --clean
           mkdir -p allure-history && rm -rf allure-history/history && cp -r allure-report/history allure-history/
+          # the trends dashboard is published next to the report: <pages url>/trends.html
+          if [ -f test-history/trends.html ]; then cp test-history/trends.html allure-report/trends.html; fi
 
       - name: Save Allure history
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: allure-history
           key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: always()
         with:
           name: allure-report
           path: allure-report
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: always()
         with:
           name: junit-results
           path: results
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        if: always()
+        with:
+          name: test-trends
+          path: test-history
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: failure()
         with:
           name: playwright-failures
@@ -175,7 +247,7 @@ jobs:
         if: failure()
         run: docker compose logs --tail=200 gitea
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         if: always() && vars.PUBLISH_PAGES == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: allure-report
@@ -189,14 +261,14 @@ jobs:
       matrix:
         browser: [firefox, webkit]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - name: Start Gitea + PostgreSQL (warms up while dependencies install)
         run: docker compose up -d --quiet-pull
       - run: pip install -r requirements.txt
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
@@ -205,17 +277,31 @@ jobs:
       # Visual baselines are Chromium screenshots, so the visual suite stays on Chromium (job "visual").
       - name: UI suite on ${{ matrix.browser }}
         run: >
-          pytest -m "ui and not visual" --browser ${{ matrix.browser }} -n auto
+          pytest -m "ui and not visual and not quarantined" --browser ${{ matrix.browser }} -n auto
           --junitxml=results/ui-${{ matrix.browser }}.xml --screenshot=only-on-failure --output=test-results
       - name: Run summary
         if: always()
         run: |
           { echo "# ${{ matrix.browser }}"; python scripts/ci_summary.py results/*.xml; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: failure()
         with:
           name: playwright-failures-${{ matrix.browser }}
           path: test-results
+
+  docker:
+    name: Suite container image (build + offline self-test)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: Build
+        run: docker build -t qualitylens:ci .
+      - name: The image runs the CLI and the offline unit suite
+        run: |
+          docker run --rm qualitylens:ci --version
+          docker run --rm qualitylens:ci doctor --offline
+          docker run --rm qualitylens:ci run unit -- -q -p no:cacheprovider
 
   publish-report:
     name: Publish Allure report to GitHub Pages
@@ -231,15 +317,15 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5
 
   load:
     name: Load test (Locust)
     needs: unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - run: bash scripts/bootstrap.sh
@@ -255,7 +341,7 @@ jobs:
       # Each run is compared with the median of earlier runs, so a gradual slowdown shows up before the SLO breaks.
       - name: Restore load history
         if: always()
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: load/history
           key: load-history-${{ github.ref_name }}-${{ github.run_id }}
@@ -270,11 +356,11 @@ jobs:
           --label "${GITHUB_SHA::7} (run ${{ github.run_number }})" --max-regression 50 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Save load history
         if: always() && hashFiles('load/history/history.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: load/history
           key: load-history-${{ github.ref_name }}-${{ github.run_id }}
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         if: always()
         with:
           name: load-report
@@ -289,8 +375,8 @@ jobs:
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
       - run: pip install -r requirements.txt
       - name: Generate fresh cases (only when an API key secret is configured)
@@ -298,7 +384,7 @@ jobs:
         run: python -m ai.generate ai/stories/create_issue.md
       - name: Compare with the manual suite
         run: python -m ai.evaluate ai/output/create_issue.ai.json --feature Issues
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         with:
           name: ai-evaluation
           path: ai/output

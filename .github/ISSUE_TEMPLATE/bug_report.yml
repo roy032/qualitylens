@@ -1,0 +1,20 @@
+name: Bug in the test suite or tooling
+description: Something in QualityLens itself is wrong (a Gitea defect goes in bug-reports/ instead)
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Command you ran, what you expected, what you got. Paste the output.
+    validations: { required: true }
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `qualitylens doctor`
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: QualityLens version and Gitea version
+      placeholder: "qualitylens 1.1.0, Gitea 1.22.6"

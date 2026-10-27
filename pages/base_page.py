@@ -4,7 +4,7 @@ A Page Object owns the selectors and actions for one screen. Tests talk to pages
 ("log in as X", "create issue Y") and never touch raw selectors, so a UI change
 means editing one class instead of every test.
 """
-from playwright.sync_api import Page, Locator, expect
+from playwright.sync_api import Locator, Page, expect
 
 from qualitylens.config import settings
 

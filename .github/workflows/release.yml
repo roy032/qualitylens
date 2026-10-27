@@ -1,0 +1,75 @@
+name: Release
+
+# Creates the version tag and a GitHub release with the built package, an SBOM and the notes from
+# CHANGELOG.md. Start it from Actions > Release > Run workflow (or push a v* tag).
+# Tags are created by this workflow, so nobody needs push rights for tags on their machine.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag, e.g. v1.1.0"
+        required: true
+      ref:
+        description: "Branch, tag or commit to release"
+        default: main
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the tag and the release
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with: { python-version: "3.12", cache: pip }
+
+      - name: Check the version
+        shell: bash
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "::error::version must look like v1.2.3"; exit 1; }
+          if [ -f pyproject.toml ]; then
+            pkg=$(python -c "import qualitylens; print(qualitylens.__version__)")
+            [ "v$pkg" = "$VERSION" ] || [ "v$pkg" = "$VERSION.0" ] || {
+              echo "::error::qualitylens.__version__ is $pkg, the release is $VERSION: bump it first"; exit 1; }
+          fi
+
+      - run: pip install -r requirements.txt build==1.6.1 cyclonedx-bom==7.5.0
+
+      - name: Offline unit suite must pass
+        run: pytest tests/unit -m unit -q
+
+      - name: Build the package (when the release has one)
+        run: if [ -f pyproject.toml ]; then python -m build --outdir dist; else mkdir -p dist; fi
+
+      - name: SBOM of the pinned dependencies (CycloneDX)
+        run: cyclonedx-py requirements requirements.txt --output-format JSON --output-file "dist/qualitylens-$VERSION.sbom.cdx.json"
+
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          section="${VERSION#v}"
+          if [ -f CHANGELOG.md ]; then
+            awk -v v="$section" '/^## \[/ { found = index($0, "[" v "]") > 0; next } found' CHANGELOG.md > notes.md
+          fi
+          [ -s notes.md ] || echo "Release $VERSION." > notes.md
+          cat notes.md
+
+      - name: Create the tag and the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$VERSION" dist/* --target "$(git rev-parse HEAD)"
+          --title "QualityLens $VERSION" --notes-file notes.md

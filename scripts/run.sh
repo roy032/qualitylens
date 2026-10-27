@@ -28,7 +28,7 @@ pytest -m smoke -n auto -q --alluredir=allure-results --junitxml=results/smoke.x
   echo "Smoke tests failed, so the full run was skipped."; python scripts/ci_summary.py results/*.xml; exit 1; }
 
 step "4/5 Full suite (parallel), then whole-database integrity rules"
-pytest -m "not smoke and not serial and not visual" -n auto -q --alluredir=allure-results --junitxml=results/regression.xml
+pytest -m "not smoke and not serial and not visual and not quarantined" -n auto -q --alluredir=allure-results --junitxml=results/regression.xml
 suite=$?
 pytest -m serial -q --alluredir=allure-results --junitxml=results/integrity.xml
 integrity=$?
